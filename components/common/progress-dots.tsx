@@ -1,0 +1,1 @@
+export function ProgressDots({ total, current }: { total: number; current: number }) { return <div className="flex gap-2">{Array.from({ length: total }).map((_, i) => <span key={i} className={`h-2 w-2 rounded-full ${i <= current ? 'bg-[#FFD95A]' : 'bg-[#EFEAE6]'}`} />)}</div>; }
