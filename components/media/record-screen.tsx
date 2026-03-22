@@ -16,5 +16,5 @@ export function RecordScreen(props: {
     if (props.isRecording) return props.onStopRecording();
     return props.onStartRecording();
   };
-  return <div className="space-y-5"><SectionTitle title="그림 친구에게 말을 걸어볼까?" description="인사해도 좋고, 이름을 물어봐도 좋아!" /><CapturePreviewCard imageUrl={props.imageUrl} /><NanaBubble message="짧게 한마디 해보면 친구가 대답할지도 몰라!" /><ExampleSpeechChips items={COPY.exampleSpeech} /><div className="flex justify-center"><RecordButton isRecording={props.isRecording} onClick={handle} /></div><AudioLevelIndicator active={props.isRecording} /><SecondaryButton onClick={props.onBack}>뒤로</SecondaryButton>{props.errorMessage && <p className="text-sm text-[#A55445]">{props.errorMessage}</p>}</div>;
+  return <div className="space-y-5"><SectionTitle title="그림 친구에게 말을 걸어볼까?" description="인사해도 좋고, 이름을 물어봐도 좋아!" /><CapturePreviewCard imageUrl={props.imageUrl} /><NanaBubble message="짧게 한마디 해보면 친구가 대답할지도 몰라!" variant="thinking" /><ExampleSpeechChips items={COPY.exampleSpeech} /><div className="flex justify-center"><RecordButton isRecording={props.isRecording} onClick={handle} /></div><AudioLevelIndicator active={props.isRecording} /><SecondaryButton onClick={props.onBack}>뒤로</SecondaryButton>{props.errorMessage && <p className="text-sm text-[#A55445]">{props.errorMessage}</p>}</div>;
 }
