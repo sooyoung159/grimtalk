@@ -1,22 +1,11 @@
 import { NextResponse } from 'next/server';
 import { buildKananaPayload, KananaInputMode } from '@/lib/kanana/build-request';
 import { parseKananaResponse } from '@/lib/kanana/parse-response';
-import { AudioConversionError, convertAudioToWav, wrapPcm16ToWav } from '@/lib/media/audio';
+import { wrapPcm16ToWav } from '@/lib/media/audio';
 
 const REQUEST_TIMEOUT_MS = 20000;
 const ALLOWED_IMAGE_MIME = new Set(['image/jpeg', 'image/png', 'image/webp']);
-const ALLOWED_AUDIO_MIME = new Set([
-  'audio/webm',
-  'audio/wav',
-  'audio/mpeg',
-  'audio/mp3',
-  'audio/ogg',
-  'audio/mp4',
-  'audio/x-m4a',
-  'audio/aac',
-  'audio/mp4;codecs=mp4a.40.2',
-]);
-const ALLOWED_AUDIO_PREFIXES = ['audio/webm', 'audio/wav', 'audio/mpeg', 'audio/mp3', 'audio/ogg', 'audio/mp4', 'audio/x-m4a', 'audio/aac'];
+const ALLOWED_AUDIO_MIME = new Set(['audio/wav', 'audio/x-wav', 'audio/wave']);
 
 type ErrorBody = { ok: false; error: string };
 
@@ -39,8 +28,7 @@ function isDebugEnabled(): boolean {
 function isAllowedAudioMime(mimeType: string): boolean {
   const normalized = mimeType.trim().toLowerCase();
   if (!normalized) return false;
-  if (ALLOWED_AUDIO_MIME.has(normalized)) return true;
-  return ALLOWED_AUDIO_PREFIXES.some((prefix) => normalized.startsWith(prefix));
+  return ALLOWED_AUDIO_MIME.has(normalized);
 }
 
 function safeBase64Preview(input: string, maxLen = 500): string {
@@ -147,7 +135,7 @@ export async function POST(req: Request) {
         received: audio.type,
         normalized: audio.type.trim().toLowerCase(),
       });
-      return fail(400, '지원하지 않는 음성 형식이야.');
+      return fail(400, '지원하지 않는 음성 형식이야. 녹음을 다시 해줘.');
     }
 
     const imageBase64 = isFile(image) ? Buffer.from(await image.arrayBuffer()).toString('base64') : undefined;
@@ -155,30 +143,13 @@ export async function POST(req: Request) {
 
     let requestAudioBase64: string | undefined;
     if (isFile(audio) && needsAudio) {
-      const rawAudioBuffer = Buffer.from(await audio.arrayBuffer());
-      let wav;
-      try {
-        wav = await convertAudioToWav({ buffer: rawAudioBuffer, mimeType: audio.type });
-      } catch (e) {
-        if (e instanceof AudioConversionError) {
-          debugLog('audio convert failed', {
-            mode,
-            audioMimeType: audio.type,
-            audioByteSize: audio.size,
-            reason: e.detail ?? e.userMessage,
-          });
-          return fail(400, e.userMessage);
-        }
-        return fail(400, '오디오 형식을 변환하지 못했어. 다시 시도해줘.');
-      }
-      requestAudioBase64 = wav.buffer.toString('base64');
+      const audioBuffer = Buffer.from(await audio.arrayBuffer());
+      requestAudioBase64 = audioBuffer.toString('base64');
 
-      debugLog('audio input normalized', {
+      debugLog('audio input passthrough', {
         mode,
-        originalMimeType: audio.type,
-        originalByteSize: audio.size,
-        convertedMimeType: wav.mimeType,
-        convertedByteSize: wav.byteSize,
+        mimeType: audio.type,
+        byteSize: audio.size,
       });
     }
 

@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { convertRecordedBlobToWav16kMono } from '@/lib/media/audio-browser';
 
 function getPreferredMimeType(): string {
   const candidates = [
@@ -14,15 +15,6 @@ function getPreferredMimeType(): string {
 
   const supported = candidates.find((v) => typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported(v));
   return supported ?? '';
-}
-
-function pickFileExtension(mimeType: string): string {
-  if (mimeType.includes('mp4') || mimeType.includes('m4a')) return 'm4a';
-  if (mimeType.includes('aac')) return 'aac';
-  if (mimeType.includes('ogg')) return 'ogg';
-  if (mimeType.includes('mp3') || mimeType.includes('mpeg')) return 'mp3';
-  if (mimeType.includes('wav')) return 'wav';
-  return 'webm';
 }
 
 export function useAudioRecorder() {
@@ -103,7 +95,7 @@ export function useAudioRecorder() {
     }
 
     try {
-      const blob = await new Promise<Blob>((resolve, reject) => {
+      const recordedBlob = await new Promise<Blob>((resolve, reject) => {
         recorder.onstop = () => {
           const finalMime = recorder.mimeType || selectedMimeTypeRef.current || 'audio/webm';
           resolve(new Blob(chunksRef.current, { type: finalMime }));
@@ -112,25 +104,23 @@ export function useAudioRecorder() {
         recorder.stop();
       });
 
+      const wavBlob = await convertRecordedBlobToWav16kMono(recordedBlob);
+
       streamRef.current?.getTracks().forEach((t) => t.stop());
       const ms = Date.now() - startedAtRef.current;
       setDurationMs(ms);
       setIsRecording(false);
 
-      const effectiveMimeType = blob.type || recorder.mimeType || selectedMimeTypeRef.current || 'audio/webm';
-      const ext = pickFileExtension(effectiveMimeType);
-      const file = new File([blob], `record-${Date.now()}.${ext}`, { type: effectiveMimeType });
+      const file = new File([wavBlob], `record-${Date.now()}.wav`, { type: 'audio/wav' });
 
-      // TODO: Safari/iOS 계열은 audio/mp4, audio/x-m4a 같은 MIME이 나올 수 있음.
-      //       서버단에서 input_audio format 매핑(mp4/aac/wav) 정책을 확정해야 함.
       return {
         file,
         previewUrl: URL.createObjectURL(file),
         durationMs: ms,
-        mimeType: effectiveMimeType,
+        mimeType: 'audio/wav',
       };
     } catch {
-      setError('녹음을 마무리하지 못했어. 한 번 더 해볼까?');
+      setError('녹음을 WAV 형식으로 변환하지 못했어. 한 번 더 해볼까?');
       setIsRecording(false);
       return null;
     } finally {
