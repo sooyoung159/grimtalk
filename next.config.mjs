@@ -1,9 +1,11 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  outputFileTracingIncludes: {
-    '/*': [
-      './node_modules/ffmpeg-static/**/*',
-    ],
+  experimental: {
+    outputFileTracingIncludes: {
+      '/api/kanana': [
+        './node_modules/ffmpeg-static/**/*',
+      ],
+    },
   },
 };
 
