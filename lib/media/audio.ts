@@ -1,7 +1,9 @@
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { access, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { constants as fsConstants } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
+import ffmpegStatic from 'ffmpeg-static';
 
 export type WavConversionResult = {
   buffer: Buffer;
@@ -29,9 +31,37 @@ function extFromMime(mimeType: string): string {
   return 'bin';
 }
 
+let ffmpegPathCache: string | null = null;
+
+async function resolveFfmpegPath(): Promise<string> {
+  if (ffmpegPathCache) return ffmpegPathCache;
+
+  const candidate = process.env.FFMPEG_PATH || ffmpegStatic || null;
+
+  if (!candidate) {
+    throw new AudioConversionError(
+      '오디오 변환 도구(ffmpeg) 경로를 찾지 못했어. ffmpeg-static 설치 상태를 확인해줘.',
+      'No ffmpeg binary path found from ffmpeg-static or FFMPEG_PATH.',
+    );
+  }
+
+  try {
+    await access(candidate, fsConstants.X_OK);
+    ffmpegPathCache = candidate;
+    return candidate;
+  } catch {
+    throw new AudioConversionError(
+      '오디오 변환 도구(ffmpeg) 실행 권한을 확인하지 못했어. 배포 런타임 설정을 확인해줘.',
+      `Resolved ffmpeg path is not executable: ${candidate}`,
+    );
+  }
+}
+
 async function runFfmpeg(args: string[]): Promise<void> {
+  const ffmpegPath = await resolveFfmpegPath();
+
   await new Promise<void>((resolve, reject) => {
-    const child = spawn('ffmpeg', args, { stdio: ['ignore', 'ignore', 'pipe'] });
+    const child = spawn(ffmpegPath, args, { stdio: ['ignore', 'ignore', 'pipe'] });
     let stderr = '';
 
     child.stderr.on('data', (chunk) => {
@@ -68,10 +98,15 @@ export async function convertAudioToWav(input: { buffer: Buffer; mimeType: strin
       byteSize: wavBuffer.length,
     };
   } catch (e) {
+    if (e instanceof AudioConversionError) throw e;
+
     const message = e instanceof Error ? e.message : String(e);
 
-    if (message.includes('spawn ffmpeg ENOENT')) {
-      throw new AudioConversionError('오디오 변환 도구(ffmpeg)를 찾지 못했어. 서버 설정을 확인해줘.', message);
+    if (message.includes('ENOENT') || message.includes('ffmpeg')) {
+      throw new AudioConversionError(
+        '오디오 변환 도구(ffmpeg)를 찾거나 실행하지 못했어. ffmpeg-static 배포 설정을 확인해줘.',
+        message,
+      );
     }
 
     throw new AudioConversionError('오디오를 읽을 수 있는 형식(wav)으로 변환하지 못했어. 다시 녹음해서 시도해줘.', message);
