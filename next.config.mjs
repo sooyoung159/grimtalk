@@ -1,3 +1,12 @@
 /** @type {import('next').NextConfig} */
-const nextConfig = {};
+const nextConfig = {
+  experimental: {
+    outputFileTracingIncludes: {
+      '/api/kanana': [
+        './node_modules/ffmpeg-static/**/*',
+      ],
+    },
+  },
+};
+
 export default nextConfig;
