@@ -11,6 +11,9 @@ export function wrapPcm16ToWav(input: {
   const sampleRate = input.sampleRate ?? 24000;
   const channels = input.channels ?? 1;
   const bitsPerSample = input.bitsPerSample ?? 16;
+
+  // TODO: sampleRate/channels/bitsPerSample(24000/1/16)은 현재 Kanana 응답 포맷 기준 가정값.
+  //       공식 스펙 변경/확정 시 route.ts 호출 파라미터와 함께 동기화 필요.
   const pcm = input.pcm;
 
   const byteRate = sampleRate * channels * (bitsPerSample / 8);

@@ -62,7 +62,7 @@ export async function convertRecordedBlobToWav16kMono(blob: Blob): Promise<Blob>
   const decodeContext = new AudioContextCtor();
 
   try {
-    const decoded = await decodeContext.decodeAudioData(arrayBuffer.slice(0));
+    const decoded = await decodeContext.decodeAudioData(arrayBuffer);
 
     const targetSampleRate = 16000;
     const targetChannels = 1;
