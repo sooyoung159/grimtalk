@@ -129,7 +129,7 @@ async function runFfmpeg(args: string[]): Promise<void> {
 
     child.on('close', (code) => {
       if (code === 0) return resolve();
-      reject(new AudioConversionError('오디오 변환 도구(ffmpeg) 실행 중 오류가 발생했어. 잠시 후 다시 시도해줘.', `[ffmpeg-exit-nonzero] code=${code}, stderr=${stderr || '<empty>'}`));
+      reject(new AudioConversionError('오디오 변환에 실패했어. 다른 오디오 파일로 다시 시도해줘.', `[ffmpeg-exit-nonzero] code=${code}, stderr=${stderr || '<empty>'}`));
     });
   });
 }

@@ -33,15 +33,17 @@
    - 1순위: `process.env.FFMPEG_PATH`
    - 2순위: `ffmpeg-static`가 제공하는 경로
 2. 실행 바이너리 준비
-   - target: `/tmp/grimtalk-ffmpeg`
-   - source 바이너리를 `/tmp/grimtalk-ffmpeg`로 복사
-   - `chmod 755` 적용
+   - `process.env.FFMPEG_PATH`가 있고 실행 가능하면 해당 경로를 직접 사용
+   - 그 외에는 target(`/tmp/grimtalk-ffmpeg`)으로 복사
+   - 복사 후 `chmod 755` 적용
 3. 실제 실행
-   - `spawn('/tmp/grimtalk-ffmpeg', args)`
+   - 직접 실행 가능한 `FFMPEG_PATH`가 있으면 그 경로로 spawn
+   - 아니면 `spawn('/tmp/grimtalk-ffmpeg', args)`
 
 요약하면:
 
-**`ffmpeg-static(or FFMPEG_PATH) -> /tmp 복사 -> chmod 755 -> spawn`**
+- 빠른 경로: **`FFMPEG_PATH(실행 가능) -> spawn`**
+- 일반 경로: **`ffmpeg-static(or 실행 불가 FFMPEG_PATH) -> /tmp 복사 -> chmod 755 -> spawn`**
 
 ---
 
