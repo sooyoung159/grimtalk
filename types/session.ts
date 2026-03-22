@@ -26,6 +26,8 @@ export interface SessionStore {
   assistantText: string;
   assistantAudioUrl: string | null;
   errorMessage: string | null;
+  recentTranscript: string | null;
+  recentTranscriptKey: string | null;
   setStep: (step: AppStep) => void;
   setCameraPermission: (value: SessionStore['cameraPermission']) => void;
   setMicPermission: (value: SessionStore['micPermission']) => void;
@@ -36,5 +38,7 @@ export interface SessionStore {
   setRecordedAudio: (payload: RecordedAudioState) => void;
   setResult: (payload: { character: CharacterCard; assistantText: string; assistantAudioUrl: string | null }) => void;
   setErrorMessage: (value: string | null) => void;
+  setRecentTranscriptCache: (payload: { key: string; transcript: string }) => void;
+  clearRecentTranscriptCache: () => void;
   resetSession: () => void;
 }

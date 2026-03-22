@@ -16,6 +16,8 @@ const initial = {
   assistantText: '',
   assistantAudioUrl: null,
   errorMessage: null,
+  recentTranscript: null,
+  recentTranscriptKey: null,
 } as const;
 
 export const useSessionStore = create<SessionStore>((set) => ({
@@ -30,5 +32,7 @@ export const useSessionStore = create<SessionStore>((set) => ({
   setRecordedAudio: (recordedAudio) => set({ recordedAudio }),
   setResult: ({ character, assistantText, assistantAudioUrl }) => set({ currentCharacter: character, assistantText, assistantAudioUrl }),
   setErrorMessage: (errorMessage) => set({ errorMessage }),
+  setRecentTranscriptCache: ({ key, transcript }) => set({ recentTranscriptKey: key, recentTranscript: transcript }),
+  clearRecentTranscriptCache: () => set({ recentTranscriptKey: null, recentTranscript: null }),
   resetSession: () => set({ ...initial }),
 }));

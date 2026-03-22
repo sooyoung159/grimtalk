@@ -11,7 +11,7 @@ interface BuildKananaPayloadParams {
   mode?: KananaInputMode;
 }
 
-function defaultTextByMode(mode: KananaInputMode): string {
+export function getDefaultTextByMode(mode: KananaInputMode): string {
   if (mode === 'image_only') {
     return '이 이미지에 무엇이 보이는지 짧게 설명해줘.';
   }
@@ -33,7 +33,7 @@ export function buildKananaPayload(params: BuildKananaPayloadParams) {
     mode = 'image_audio',
   } = params;
 
-  const userText = text?.trim() || defaultTextByMode(mode);
+  const userText = text?.trim() || getDefaultTextByMode(mode);
 
   const content: Array<Record<string, unknown>> = [{ type: 'text', text: userText }];
 

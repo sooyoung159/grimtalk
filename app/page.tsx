@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { AppShell } from '@/components/common/app-shell';
 import { LandingScreen } from '@/components/landing/landing-screen';
 import { CameraScreen } from '@/components/media/camera-screen';
@@ -14,73 +14,140 @@ import { useAudioRecorder } from '@/hooks/use-audio-recorder';
 import { useKananaRequest, KananaInputMode } from '@/hooks/use-kanana-request';
 import { useSessionStore } from '@/stores/session-store';
 import { useConversationStore } from '@/stores/conversation-store';
+import { getDefaultTextByMode } from '@/lib/kanana/build-request';
+
+function composeTurnText(mode: KananaInputMode, baseText: string, previousUser: string | null, previousAssistant: string | null): string {
+  if (!previousUser || !previousAssistant) return baseText;
+
+  return [
+    baseText,
+    '',
+    '직전 대화 참고(최근 1턴):',
+    `- 사용자: ${previousUser}`,
+    `- 친구: ${previousAssistant}`,
+    '위 맥락은 참고만 하고, 이번 사용자 입력(특히 방금 음성)에 우선 반응해줘.',
+  ].join('\n');
+}
+
+function makeTranscriptKey(audioFile: File): string {
+  return [audioFile.name, audioFile.size, audioFile.type, audioFile.lastModified].join(':');
+}
 
 export default function HomePage() {
-  const s = useSessionStore();
+  const step = useSessionStore((st) => st.step);
+  const capturedImage = useSessionStore((st) => st.capturedImage);
+  const currentCharacter = useSessionStore((st) => st.currentCharacter);
+  const assistantText = useSessionStore((st) => st.assistantText);
+  const assistantAudioUrl = useSessionStore((st) => st.assistantAudioUrl);
+  const errorMessage = useSessionStore((st) => st.errorMessage);
+  const recentTranscript = useSessionStore((st) => st.recentTranscript);
+  const recentTranscriptKey = useSessionStore((st) => st.recentTranscriptKey);
+
+  const setStep = useSessionStore((st) => st.setStep);
+  const setSubmitting = useSessionStore((st) => st.setSubmitting);
+  const setResult = useSessionStore((st) => st.setResult);
+  const setErrorMessage = useSessionStore((st) => st.setErrorMessage);
+  const setCapturedImage = useSessionStore((st) => st.setCapturedImage);
+  const setRecordedAudio = useSessionStore((st) => st.setRecordedAudio);
+  const setRecentTranscriptCache = useSessionStore((st) => st.setRecentTranscriptCache);
+  const resetSession = useSessionStore((st) => st.resetSession);
+
   const media = useMediaCapture();
   const audio = useAudioRecorder();
   const kanana = useKananaRequest();
   const clearMessages = useConversationStore((st) => st.clearMessages);
+  const addTurn = useConversationStore((st) => st.addTurn);
+  const recentUserText = useConversationStore((st) => st.recentUserText);
+  const recentAssistantText = useConversationStore((st) => st.recentAssistantText);
+  const messages = useConversationStore((st) => st.messages);
   const [mode, setMode] = useState<KananaInputMode>('image_audio');
 
-  useEffect(() => {
-    s.setCameraPermission(media.permission);
-    s.setCameraReady(media.isReady);
-  }, [media.permission, media.isReady]);
+  // NOTE: permission/recording 상태는 훅의 값을 직접 사용한다.
+  // store로 다시 미러링하면 dev 모드에서 불필요한 업데이트 루프를 유발할 수 있음.
 
-  useEffect(() => {
-    s.setMicPermission(audio.permission);
-    s.setRecording(audio.isRecording);
-  }, [audio.permission, audio.isRecording]);
+  const extractUserUtterance = async (audioFile?: File): Promise<string | null> => {
+    if (!audioFile) return null;
+
+    const key = makeTranscriptKey(audioFile);
+
+    // 동일 오디오 파일이면 최근 1개 캐시 재사용
+    if (recentTranscriptKey === key && recentTranscript) {
+      return recentTranscript;
+    }
+
+    try {
+      const transcript = await kanana.submitFirstTurn({
+        audio: audioFile,
+        mode: 'audio_only',
+      });
+      const t = transcript.assistantText?.trim();
+      if (!t) return null;
+
+      setRecentTranscriptCache({ key, transcript: t });
+      return t;
+    } catch {
+      return null;
+    }
+  };
 
   const submitByMode = async (payload: { image?: File; audioFile?: File }) => {
-    s.setStep('loading');
-    s.setSubmitting(true);
+    setStep('loading');
+    setSubmitting(true);
     try {
-      const result = await kanana.submitFirstTurn({ image: payload.image, audio: payload.audioFile, mode });
-      s.setResult({ character: result.character, assistantText: result.assistantText, assistantAudioUrl: result.audioUrl });
-      s.setStep('result');
+      const baseText = getDefaultTextByMode(mode);
+      const requestText = composeTurnText(mode, baseText, recentUserText, recentAssistantText);
+
+      const extractedUserUtterance = await extractUserUtterance(payload.audioFile);
+
+      const result = await kanana.submitFirstTurn({ image: payload.image, audio: payload.audioFile, mode, text: requestText });
+      setResult({ character: result.character, assistantText: result.assistantText, assistantAudioUrl: result.audioUrl });
+      addTurn({
+        userText: extractedUserUtterance ?? (mode === 'image_only' ? '이미지 설명 요청' : baseText),
+        assistantText: result.assistantText,
+        assistantAudioUrl: result.audioUrl,
+      });
+      setStep('result');
     } catch (e) {
-      s.setErrorMessage(e instanceof Error ? e.message : '친구를 깨우지 못했어. 한 번 더 해볼까?');
-      s.setStep(mode === 'image_only' ? 'preview' : 'record');
+      setErrorMessage(e instanceof Error ? e.message : '친구를 깨우지 못했어. 한 번 더 해볼까?');
+      setStep(mode === 'image_only' ? 'preview' : 'record');
     } finally {
-      s.setSubmitting(false);
+      setSubmitting(false);
     }
   };
 
   const handleCapture = async () => {
     const captured = await media.captureFrame();
     if (!captured) return;
-    s.setCapturedImage(captured);
-    s.setStep('preview');
+    setCapturedImage(captured);
+    setStep('preview');
   };
 
   const handlePreviewContinue = async () => {
     if (mode === 'image_only') {
-      if (!s.capturedImage.file) return;
-      await submitByMode({ image: s.capturedImage.file });
+      if (!capturedImage.file) return;
+      await submitByMode({ image: capturedImage.file });
       return;
     }
-    s.setStep('record');
+    setStep('record');
   };
 
   const handleStopRecording = async () => {
     const recorded = await audio.stopRecording();
     if (!recorded) return;
 
-    s.setRecordedAudio(recorded);
+    setRecordedAudio(recorded);
 
     if (mode === 'audio_only') {
       await submitByMode({ audioFile: recorded.file });
       return;
     }
 
-    if (!s.capturedImage.file) return;
-    await submitByMode({ image: s.capturedImage.file, audioFile: recorded.file });
+    if (!capturedImage.file) return;
+    await submitByMode({ image: capturedImage.file, audioFile: recorded.file });
   };
 
   const handleStart = () => {
-    s.setStep(mode === 'audio_only' ? 'record' : 'camera');
+    setStep(mode === 'audio_only' ? 'record' : 'camera');
   };
 
   const showModeToggle = process.env.NODE_ENV !== 'production';
@@ -102,36 +169,37 @@ export default function HomePage() {
         </div>
       )}
 
-      {s.step === 'landing' && <LandingScreen onStart={handleStart} />}
-      {s.step === 'camera' && <CameraScreen permission={s.cameraPermission} isCameraReady={s.isCameraReady} videoRef={media.videoRef} errorMessage={media.error ?? s.errorMessage} onRequestCamera={media.requestCamera} onCapture={handleCapture} onBack={() => s.setStep('landing')} />}
-      {s.step === 'preview' && s.capturedImage.previewUrl && <PreviewScreen imageUrl={s.capturedImage.previewUrl} onRetake={() => s.setStep('camera')} onContinue={handlePreviewContinue} />}
-      {s.step === 'record' && (mode === 'audio_only' || s.capturedImage.previewUrl) && (
+      {step === 'landing' && <LandingScreen onStart={handleStart} />}
+      {step === 'camera' && <CameraScreen permission={media.permission} isCameraReady={media.isReady} videoRef={media.videoRef} errorMessage={media.error ?? errorMessage} onRequestCamera={media.requestCamera} onCapture={handleCapture} onBack={() => setStep('landing')} />}
+      {step === 'preview' && capturedImage.previewUrl && <PreviewScreen imageUrl={capturedImage.previewUrl} onRetake={() => setStep('camera')} onContinue={handlePreviewContinue} />}
+      {step === 'record' && (mode === 'audio_only' || capturedImage.previewUrl) && (
         <RecordScreen
-          imageUrl={s.capturedImage.previewUrl ?? '/logo.svg'}
-          permission={s.micPermission}
-          isRecording={s.isRecording}
-          errorMessage={audio.error ?? s.errorMessage}
+          imageUrl={capturedImage.previewUrl ?? '/logo.svg'}
+          permission={audio.permission}
+          isRecording={audio.isRecording}
+          errorMessage={audio.error ?? errorMessage}
           onRequestMic={audio.requestMic}
           onStartRecording={audio.startRecording}
           onStopRecording={handleStopRecording}
-          onBack={() => s.setStep(mode === 'audio_only' ? 'landing' : 'preview')}
+          onBack={() => setStep(mode === 'audio_only' ? 'landing' : 'preview')}
         />
       )}
-      {s.step === 'loading' && <LoadingScreen imageUrl={s.capturedImage.previewUrl} />}
-      {s.step === 'result' && s.currentCharacter && (
+      {step === 'loading' && <LoadingScreen imageUrl={capturedImage.previewUrl} />}
+      {step === 'result' && currentCharacter && (
         <ResultScreen
-          imageUrl={s.capturedImage.previewUrl ?? '/logo.svg'}
-          character={s.currentCharacter}
-          assistantText={s.assistantText}
-          audioUrl={s.assistantAudioUrl}
-          onTalkAgain={() => s.setStep(mode === 'audio_only' ? 'record' : mode === 'image_only' ? 'preview' : 'record')}
+          imageUrl={capturedImage.previewUrl ?? '/logo.svg'}
+          character={currentCharacter}
+          assistantText={assistantText}
+          audioUrl={assistantAudioUrl}
+          recentMessages={messages}
+          onTalkAgain={() => setStep(mode === 'audio_only' ? 'record' : mode === 'image_only' ? 'preview' : 'record')}
           onRestart={() => {
-            s.resetSession();
+            resetSession();
             clearMessages();
           }}
         />
       )}
-      {s.step === 'conversation' && <ConversationScreen />}
+      {step === 'conversation' && <ConversationScreen />}
     </AppShell>
   );
 }
