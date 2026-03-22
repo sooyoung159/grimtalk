@@ -27,8 +27,8 @@
    - 기존: `spawn('ffmpeg', args)`
    - 변경: `spawn(<resolved ffmpeg binary path>, args)`
 3. 경로 해결 우선순위
-   - 1순위: `ffmpeg-static`가 제공하는 바이너리 경로
-   - 2순위: `process.env.FFMPEG_PATH` (운영자가 강제 지정할 때)
+   - 1순위: `process.env.FFMPEG_PATH` (운영자가 강제 지정할 때)
+   - 2순위: `ffmpeg-static`가 제공하는 바이너리 경로
    - 둘 다 없으면 명확한 `AudioConversionError` 반환
 
 또한 경로가 실제 실행 가능한지(`X_OK`) 검증 후 실행한다.

@@ -36,7 +36,7 @@ let ffmpegPathCache: string | null = null;
 async function resolveFfmpegPath(): Promise<string> {
   if (ffmpegPathCache) return ffmpegPathCache;
 
-  const candidate = ffmpegStatic || process.env.FFMPEG_PATH || null;
+  const candidate = process.env.FFMPEG_PATH || ffmpegStatic || null;
 
   if (!candidate) {
     throw new AudioConversionError(
