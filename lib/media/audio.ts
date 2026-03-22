@@ -1,4 +1,4 @@
-import { access, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { access, chmod, copyFile, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { constants as fsConstants } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -32,29 +32,83 @@ function extFromMime(mimeType: string): string {
 }
 
 let ffmpegPathCache: string | null = null;
+const ffmpegTmpPath = path.join(tmpdir(), 'grimtalk-ffmpeg');
 
-async function resolveFfmpegPath(): Promise<string> {
-  if (ffmpegPathCache) return ffmpegPathCache;
+async function ensureExecutable(pathToCheck: string): Promise<boolean> {
+  try {
+    await access(pathToCheck, fsConstants.X_OK);
+    return true;
+  } catch {
+    return false;
+  }
+}
 
-  const candidate = process.env.FFMPEG_PATH || ffmpegStatic || null;
+async function prepareFfmpegInTmp(sourcePath: string): Promise<string> {
+  const alreadyPrepared = await ensureExecutable(ffmpegTmpPath);
+  if (alreadyPrepared) {
+    return ffmpegTmpPath;
+  }
 
-  if (!candidate) {
+  try {
+    await copyFile(sourcePath, ffmpegTmpPath);
+  } catch (e) {
+    const detail = e instanceof Error ? e.message : String(e);
     throw new AudioConversionError(
-      '오디오 변환 도구(ffmpeg) 경로를 찾지 못했어. ffmpeg-static 설치 상태를 확인해줘.',
-      'No ffmpeg binary path found from ffmpeg-static or FFMPEG_PATH.',
+      '오디오 변환 도구(ffmpeg)를 준비하지 못했어. 서버 런타임 설정을 확인해줘.',
+      `[ffmpeg-copy-failed] source=${sourcePath}, target=${ffmpegTmpPath}, reason=${detail}`,
     );
   }
 
   try {
-    await access(candidate, fsConstants.X_OK);
-    ffmpegPathCache = candidate;
-    return candidate;
-  } catch {
+    await chmod(ffmpegTmpPath, 0o755);
+  } catch (e) {
+    const detail = e instanceof Error ? e.message : String(e);
     throw new AudioConversionError(
-      '오디오 변환 도구(ffmpeg) 실행 권한을 확인하지 못했어. 배포 런타임 설정을 확인해줘.',
-      `Resolved ffmpeg path is not executable: ${candidate}`,
+      '오디오 변환 도구(ffmpeg) 실행 권한을 준비하지 못했어. 서버 런타임 설정을 확인해줘.',
+      `[ffmpeg-chmod-failed] target=${ffmpegTmpPath}, reason=${detail}`,
     );
   }
+
+  const executable = await ensureExecutable(ffmpegTmpPath);
+  if (!executable) {
+    throw new AudioConversionError(
+      '오디오 변환 도구(ffmpeg) 실행 파일을 준비했지만 실행할 수 없어. 배포 런타임 설정을 확인해줘.',
+      `[ffmpeg-not-executable-after-chmod] target=${ffmpegTmpPath}`,
+    );
+  }
+
+  return ffmpegTmpPath;
+}
+
+async function resolveFfmpegPath(): Promise<string> {
+  if (ffmpegPathCache) return ffmpegPathCache;
+
+  const envPath = process.env.FFMPEG_PATH || null;
+
+  if (envPath) {
+    const envExecutable = await ensureExecutable(envPath);
+    if (envExecutable) {
+      ffmpegPathCache = envPath;
+      return envPath;
+    }
+
+    // env 경로가 있으나 실행 불가하면 /tmp로 복사 시도
+    ffmpegPathCache = await prepareFfmpegInTmp(envPath);
+    return ffmpegPathCache;
+  }
+
+  const staticPath = ffmpegStatic || null;
+  if (!staticPath) {
+    throw new AudioConversionError(
+      '오디오 변환 도구(ffmpeg) 경로를 찾지 못했어. ffmpeg-static 설치 상태를 확인해줘.',
+      'No ffmpeg binary path found from FFMPEG_PATH or ffmpeg-static.',
+    );
+  }
+
+  // ffmpeg-static은 배포 번들 경로(/var/task 등)에서 실행 권한 이슈가 날 수 있어
+  // 항상 /tmp로 복사 후 실행한다.
+  ffmpegPathCache = await prepareFfmpegInTmp(staticPath);
+  return ffmpegPathCache;
 }
 
 async function runFfmpeg(args: string[]): Promise<void> {
@@ -69,12 +123,13 @@ async function runFfmpeg(args: string[]): Promise<void> {
     });
 
     child.on('error', (err) => {
-      reject(err);
+      const detail = err instanceof Error ? err.message : String(err);
+      reject(new AudioConversionError('오디오 변환 도구(ffmpeg)를 실행하지 못했어. 서버 설정을 확인해줘.', `[ffmpeg-spawn-failed] path=${ffmpegPath}, reason=${detail}`));
     });
 
     child.on('close', (code) => {
       if (code === 0) return resolve();
-      reject(new Error(stderr || `ffmpeg exited with code ${code}`));
+      reject(new AudioConversionError('오디오 변환에 실패했어. 다른 오디오 파일로 다시 시도해줘.', `[ffmpeg-exit-nonzero] code=${code}, stderr=${stderr || '<empty>'}`));
     });
   });
 }
@@ -104,8 +159,8 @@ export async function convertAudioToWav(input: { buffer: Buffer; mimeType: strin
 
     if (message.includes('ENOENT') || message.includes('ffmpeg')) {
       throw new AudioConversionError(
-        '오디오 변환 도구(ffmpeg)를 찾거나 실행하지 못했어. ffmpeg-static 배포 설정을 확인해줘.',
-        message,
+        '오디오 변환 도구(ffmpeg)를 찾거나 실행하지 못했어. ffmpeg 배포 설정을 확인해줘.',
+        `[ffmpeg-runtime-error] ${message}`,
       );
     }
 

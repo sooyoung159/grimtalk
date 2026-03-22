@@ -5,69 +5,89 @@
 배포 환경에서 아래 에러가 발생할 수 있다.
 
 - `spawn ffmpeg ENOENT`
-- `오디오 변환 도구(ffmpeg)를 찾지 못했어...`
+- `Resolved ffmpeg path is not executable: /var/task/.../ffmpeg`
 
-원인: 로컬 개발 환경(macOS 등)에는 `ffmpeg`가 PATH에 설치되어 있는 경우가 많지만,
-배포 런타임(서버리스/컨테이너 최소 이미지)은 시스템 `ffmpeg` 바이너리를 기본 제공하지 않는다.
+첫 번째는 ffmpeg를 **못 찾는 문제**고,
+두 번째는 ffmpeg 경로를 **찾았지만 실행 권한이 없는 문제**다.
 
-즉,
-- **로컬**: `spawn('ffmpeg', ...)` 동작할 수 있음
-- **배포**: PATH에 `ffmpeg` 없음 → ENOENT
-
----
-
-## 해결 방식
-
-시스템 ffmpeg 의존을 제거하고, 프로젝트 의존성으로 `ffmpeg-static`을 사용한다.
-
-### 적용 내용
-
-1. `package.json`에 `ffmpeg-static` 추가
-2. `lib/media/audio.ts`에서
-   - 기존: `spawn('ffmpeg', args)`
-   - 변경: `spawn(<resolved ffmpeg binary path>, args)`
-3. 경로 해결 우선순위
-   - 1순위: `process.env.FFMPEG_PATH` (운영자가 강제 지정할 때)
-   - 2순위: `ffmpeg-static`가 제공하는 바이너리 경로
-   - 둘 다 없으면 명확한 `AudioConversionError` 반환
-
-또한 경로가 실제 실행 가능한지(`X_OK`) 검증 후 실행한다.
+특히 Vercel 같은 서버리스 런타임에서는 빌드 산출물이 `/var/task` 아래에 위치하는데,
+패키지에 포함된 바이너리를 해당 경로에서 직접 실행할 때 권한 제약(`X_OK` 실패)이 발생할 수 있다.
 
 ---
 
-## 런타임 동작 요약
+## 왜 로컬에서는 되고 배포에서는 안 되나?
 
-`convertAudioToWav()` 호출 시:
+- **로컬**: PATH 기반 시스템 ffmpeg 또는 로컬 파일 실행이 상대적으로 자유로움
+- **배포(Vercel)**: 번들 경로(`/var/task/...`)에서 바이너리 직접 실행이 제한될 수 있음
 
-1. `resolveFfmpegPath()` 실행
-2. ffmpeg 경로를 캐시/검증
-3. ffmpeg 바이너리를 절대경로로 spawn
-4. 입력 오디오를 wav(pcm_s16le, mono, 16kHz)로 변환
-5. 실패 시 사용자 메시지 + 상세 로그(detail) 분리
+즉, `ffmpeg-static` 경로를 알아내는 것만으로는 충분하지 않고,
+**실행 가능한 위치로 옮겨서 권한을 다시 부여**해야 안정적으로 동작한다.
+
+---
+
+## 현재 해결 방식
+
+현재 런타임 전략은 아래 순서다.
+
+1. ffmpeg 소스 경로 결정
+   - 1순위: `process.env.FFMPEG_PATH`
+   - 2순위: `ffmpeg-static`가 제공하는 경로
+2. 실행 바이너리 준비
+   - `process.env.FFMPEG_PATH`가 있고 실행 가능하면 해당 경로를 직접 사용
+   - 그 외에는 target(`/tmp/grimtalk-ffmpeg`)으로 복사
+   - 복사 후 `chmod 755` 적용
+3. 실제 실행
+   - 직접 실행 가능한 `FFMPEG_PATH`가 있으면 그 경로로 spawn
+   - 아니면 `spawn('/tmp/grimtalk-ffmpeg', args)`
+
+요약하면:
+
+- 빠른 경로: **`FFMPEG_PATH(실행 가능) -> spawn`**
+- 일반 경로: **`ffmpeg-static(or 실행 불가 FFMPEG_PATH) -> /tmp 복사 -> chmod 755 -> spawn`**
+
+---
+
+## 경로 캐시 전략
+
+- `ffmpegPathCache`에 최종 실행 경로를 캐시한다.
+- `/tmp/grimtalk-ffmpeg`가 이미 실행 가능하면 재복사하지 않는다.
+- 결과적으로 콜드 스타트 이후에는 준비 비용이 줄어든다.
+
+---
+
+## 에러 처리 정책
+
+사용자 메시지는 친절하고 짧게 유지하되,
+`detail`에는 운영 진단 가능한 원인 태그를 남긴다.
+
+예시 detail 태그:
+- `[ffmpeg-copy-failed]`
+- `[ffmpeg-chmod-failed]`
+- `[ffmpeg-not-executable-after-chmod]`
+- `[ffmpeg-spawn-failed]`
+- `[ffmpeg-exit-nonzero]`
+
+이렇게 하면 로그에서 실패 지점을 빠르게 분리할 수 있다.
 
 ---
 
 ## 그래도 안 되는 플랫폼이 있는 경우
 
-`ffmpeg-static`이 일부 런타임/아키텍처에서 제한될 수 있다.
-
 ### 대안 A: Docker 가능 플랫폼
 
-배포 이미지를 직접 제어할 수 있으면 Docker 이미지에 시스템 ffmpeg를 포함한다.
-
-예시:
+배포 이미지를 직접 제어할 수 있으면 시스템 ffmpeg를 이미지에 포함한다.
 
 ```dockerfile
 RUN apt-get update && apt-get install -y ffmpeg && rm -rf /var/lib/apt/lists/*
 ```
 
-그 후 `FFMPEG_PATH`를 명시적으로 주입해 경로를 고정할 수 있다.
+필요 시 `FFMPEG_PATH`로 실행 경로를 강제 지정한다.
 
 ### 대안 B: 클라이언트 측 wav 인코딩
 
-서버에서 ffmpeg를 쓰지 않고, 클라이언트에서 wav(16kHz mono)로 인코딩해서 업로드한다.
+서버 ffmpeg 의존을 없애고 클라이언트에서 wav(16kHz mono)로 인코딩해 업로드한다.
 
-- 장점: 서버 런타임 바이너리 의존 제거
+- 장점: 서버 런타임 바이너리 제약 회피
 - 단점: 브라우저 구현/성능/호환성 고려 필요
 
 ---
@@ -75,6 +95,6 @@ RUN apt-get update && apt-get install -y ffmpeg && rm -rf /var/lib/apt/lists/*
 ## 운영 체크리스트
 
 - [ ] `ffmpeg-static`가 프로덕션 의존성에 포함되었는가
-- [ ] 빌드 후 런타임에서 바이너리 파일 접근이 가능한가
-- [ ] 서버 로그에 `Resolved ffmpeg path is not executable`가 없는가
+- [ ] 첫 호출에서 `/tmp/grimtalk-ffmpeg` 복사/권한 설정이 성공하는가
+- [ ] 로그에 `[ffmpeg-copy-failed]`, `[ffmpeg-chmod-failed]`가 없는가
 - [ ] 변환 입력(webm/mp4/m4a/aac/ogg/mp3) 케이스가 정상 변환되는가
