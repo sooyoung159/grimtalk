@@ -5,5 +5,21 @@ import { CapturePreviewCard } from './capture-preview-card';
 import { NanaBubble } from '@/components/nana/nana-bubble';
 
 export function PreviewScreen({ imageUrl, onRetake, onContinue }: { imageUrl: string; onRetake: () => void; onContinue: () => void; }) {
-  return <div className="space-y-5"><SectionTitle title="이 그림으로 할까?" description="친구가 잘 보이면 그대로 계속해도 좋아!" /><CapturePreviewCard imageUrl={imageUrl} /><NanaBubble message="좋아! 이제 이 친구에게 말을 걸어보자." /><PrimaryButton onClick={onContinue}>이 그림으로 계속</PrimaryButton><SecondaryButton onClick={onRetake}>다시 찍기</SecondaryButton></div>;
+  return (
+    <div className="space-y-5 animate-result-enter">
+      <SectionTitle title="잘 찍혔어! 이 그림으로 깨워볼까?" description="친구가 잘 보이면 바로 다음 단계에서 말을 걸 수 있어." />
+
+      <div className="space-y-2">
+        <CapturePreviewCard imageUrl={imageUrl} />
+        <p className="text-xs text-[#9A8F83]">방금 찍은 그림이야. 마음에 들면 그대로 이어가자.</p>
+      </div>
+
+      <NanaBubble message="좋아! 이제 이 친구에게 한마디만 해주면 깨어날 거야." />
+
+      <div className="space-y-3">
+        <PrimaryButton onClick={onContinue}>이 그림으로 계속하기</PrimaryButton>
+        <SecondaryButton onClick={onRetake}>한 번 더 찍기</SecondaryButton>
+      </div>
+    </div>
+  );
 }
