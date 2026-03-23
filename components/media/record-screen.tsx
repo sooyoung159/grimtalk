@@ -16,5 +16,32 @@ export function RecordScreen(props: {
     if (props.isRecording) return props.onStopRecording();
     return props.onStartRecording();
   };
-  return <div className="space-y-5"><SectionTitle title="그림 친구에게 말을 걸어볼까?" description="인사해도 좋고, 이름을 물어봐도 좋아!" /><CapturePreviewCard imageUrl={props.imageUrl} /><NanaBubble message="짧게 한마디 해보면 친구가 대답할지도 몰라!" variant="thinking" /><ExampleSpeechChips items={COPY.exampleSpeech} /><div className="flex justify-center"><RecordButton isRecording={props.isRecording} onClick={handle} /></div><AudioLevelIndicator active={props.isRecording} /><SecondaryButton onClick={props.onBack}>뒤로</SecondaryButton>{props.errorMessage && <p className="text-sm text-[#A55445]">{props.errorMessage}</p>}</div>;
+
+  return (
+    <div className="space-y-5 animate-result-enter">
+      <SectionTitle title="그림 친구에게 말을 걸어볼까?" description="한마디만 들려줘도 친구가 목소리를 기억하고 답해줄 거야." />
+
+      <div className="space-y-2">
+        <CapturePreviewCard imageUrl={props.imageUrl} />
+        <p className="text-xs text-[#9A8F83]">이 그림 친구에게 직접 말을 걸어보자.</p>
+      </div>
+
+      <NanaBubble message="짧게 말해줘도 충분해! 친구가 귀 기울이고 있어." variant="thinking" />
+
+      <div className="space-y-2">
+        <p className="text-xs font-semibold text-[#8B8177]">이렇게 말해봐도 좋아</p>
+        <ExampleSpeechChips items={COPY.exampleSpeech} />
+      </div>
+
+      <div className="flex justify-center pt-1">
+        <RecordButton isRecording={props.isRecording} onClick={handle} />
+      </div>
+
+      <AudioLevelIndicator active={props.isRecording} />
+
+      <SecondaryButton onClick={props.onBack}>{props.permission === 'granted' ? '그림 다시 보기' : '뒤로'}</SecondaryButton>
+
+      {props.errorMessage && <p className="rounded-2xl bg-[#FFF5F2] px-4 py-3 text-sm text-[#A55445]">{props.errorMessage}</p>}
+    </div>
+  );
 }
