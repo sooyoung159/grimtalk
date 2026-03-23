@@ -16,7 +16,7 @@ export function LoadingScreen({ message, imageUrl }: { imageUrl?: string | null;
 
   const title = useMemo(() => {
     if (message?.trim()) return message;
-    return LOADING_MESSAGES[messageIndex] ?? LOADING_MESSAGES[0];
+    return LOADING_MESSAGES[messageIndex];
   }, [message, messageIndex]);
 
   useEffect(() => {

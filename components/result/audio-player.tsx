@@ -52,8 +52,7 @@ export function AudioPlayer({ audioUrl }: { audioUrl?: string | null }) {
 
       <audio
         ref={audioRef}
-        controls
-        className="w-full"
+        className="hidden"
         onEnded={() => setIsPlaying(false)}
         onPause={() => setIsPlaying(false)}
         onPlay={() => setIsPlaying(true)}

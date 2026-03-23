@@ -8,7 +8,7 @@ import { NanaBubble } from '@/components/nana/nana-bubble';
 import type { ConversationMessage } from '@/stores/conversation-store';
 import { RecentConversationCard } from './recent-conversation-card';
 
-export function ResultScreen({ imageUrl, character, assistantText, audioUrl, recentMessages, onTalkAgain, onRestart }: { imageUrl: string; character: T; assistantText: string; audioUrl?: string | null; recentMessages?: ConversationMessage[]; onTalkAgain: () => void; onRestart: () => void; onReplayAudio?: () => void; }) {
+export function ResultScreen({ imageUrl, character, assistantText, audioUrl, recentMessages, onTalkAgain, onRestart }: { imageUrl: string; character: T; assistantText: string; audioUrl?: string | null; recentMessages?: ConversationMessage[]; onTalkAgain: () => void; onRestart: () => void; }) {
   const latest = (recentMessages ?? []).slice(-2);
 
   return (

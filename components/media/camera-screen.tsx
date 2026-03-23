@@ -9,6 +9,7 @@ export function CameraScreen(props: {
   onRequestCamera: () => Promise<void> | void; onCapture: () => Promise<void> | void; onBack: () => void;
 }) {
   const cameraActionLabel = props.permission !== 'granted' ? '카메라 열기' : '이 그림 찍기';
+  const handleCameraAction = props.permission !== 'granted' ? props.onRequestCamera : props.onCapture;
 
   return (
     <div className="space-y-5 animate-result-enter">
@@ -18,7 +19,7 @@ export function CameraScreen(props: {
       <CameraFrame videoRef={props.videoRef} ready={props.isCameraReady} />
 
       <div className="space-y-3">
-        <PrimaryButton onClick={props.permission !== 'granted' ? props.onRequestCamera : props.onCapture}>{cameraActionLabel}</PrimaryButton>
+        <PrimaryButton onClick={handleCameraAction}>{cameraActionLabel}</PrimaryButton>
         <SecondaryButton onClick={props.onBack}>처음으로</SecondaryButton>
       </div>
 
