@@ -16,17 +16,32 @@ import { useSessionStore } from '@/stores/session-store';
 import { useConversationStore } from '@/stores/conversation-store';
 import { getDefaultTextByMode } from '@/lib/kanana/build-request';
 
-function composeTurnText(mode: KananaInputMode, baseText: string, previousUser: string | null, previousAssistant: string | null): string {
-  if (!previousUser || !previousAssistant) return baseText;
+function trimContext(text: string | null, max: number): string | null {
+  if (!text) return null;
+  const normalized = text.replace(/\s+/g, ' ').trim();
+  if (!normalized) return null;
+  if (normalized.length <= max) return normalized;
+  return `${normalized.slice(0, max - 1)}…`;
+}
 
-  return [
-    baseText,
-    '',
-    '직전 대화 참고(최근 1턴):',
-    `- 사용자: ${previousUser}`,
-    `- 친구: ${previousAssistant}`,
-    '위 맥락은 참고만 하고, 이번 사용자 입력(특히 방금 음성)에 우선 반응해줘.',
-  ].join('\n');
+function composeTurnText(mode: KananaInputMode, baseText: string, previousUser: string | null, previousAssistant: string | null): string {
+  const compactUser = trimContext(previousUser, 80);
+  const compactAssistant = trimContext(previousAssistant, 120);
+
+  const sections: string[] = [
+    `이번 턴 목표:\n${baseText}`,
+    '이번 턴 우선 규칙:\n- 직전 대화는 참고만 하고, 지금 사용자의 마지막 발화(특히 방금 음성)에 먼저 반응해줘.\n- 이미 같은 친구로 대화 중이면 자기소개를 반복하지 마.',
+  ];
+
+  if (compactUser && compactAssistant) {
+    sections.splice(1, 0, ['최근 1턴 참고:', `- 사용자: ${compactUser}`, `- 친구: ${compactAssistant}`].join('\n'));
+  }
+
+  if (mode === 'image_audio') {
+    sections.push('추가 규칙:\n- 이미지 분위기를 유지하되, 이번 발화 반응을 가장 먼저 보여줘.');
+  }
+
+  return sections.join('\n\n');
 }
 
 function makeTranscriptKey(audioFile: File): string {

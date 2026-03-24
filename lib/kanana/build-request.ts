@@ -13,13 +13,17 @@ interface BuildKananaPayloadParams {
 
 export function getDefaultTextByMode(mode: KananaInputMode): string {
   if (mode === 'image_only') {
-    return '이 이미지에 무엇이 보이는지 짧게 설명해줘.';
+    return '이미지 속 친구의 관점에서 짧고 따뜻하게 반응해줘. 설명만 하지 말고 마지막에 가벼운 질문 한 문장을 붙여줘.';
   }
   if (mode === 'audio_only') {
     return '방금 사용자가 한 말을 가능한 그대로 한국어로 적어줘. 뜻을 바꾸거나 요약하지 말고, 들은 문장을 최대한 원문에 가깝게 한 문장으로 써줘.';
   }
 
-  return '이미지 속 친구가 되어, 방금 사용자의 말에 답해줘. 너는 그림 속 캐릭터다. 절대 카나나라고 소개하지 마. 사용자의 마지막 말에 직접 반응해라.';
+  return [
+    '이번 턴 목표: 이미지 속 친구가 되어, 방금 사용자의 말에 답해줘.',
+    '우선순위: 직전 대화는 참고만 하고, 이번 마지막 발화에 먼저 반응해줘.',
+    '형식: 2~4문장, 짧고 따뜻하게, 마지막은 부담 없는 질문으로 끝내줘.',
+  ].join('\n');
 }
 
 export function buildKananaPayload(params: BuildKananaPayloadParams) {
