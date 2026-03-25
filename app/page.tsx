@@ -161,8 +161,7 @@ export default function HomePage() {
     setStep(mode === 'audio_only' ? 'record' : 'camera');
   };
 
-  const isMockMode = process.env.NEXT_PUBLIC_KANANA_MODE === 'mock';
-  const showModeToggle = process.env.NODE_ENV !== 'production' && isMockMode;
+  const showModeToggle = process.env.NODE_ENV !== 'production' && process.env.NEXT_PUBLIC_KANANA_MODE === 'mock';
 
   return (
     <AppShell>
@@ -199,7 +198,7 @@ export default function HomePage() {
       {step === 'loading' && <LoadingScreen imageUrl={capturedImage.previewUrl} />}
       {step === 'result' && currentCharacter && (
         <ResultScreen
-          imageUrl={capturedImage.previewUrl ?? '/logo.svg'}
+          imageUrl={capturedImage.previewUrl}
           character={currentCharacter}
           assistantText={assistantText}
           audioUrl={assistantAudioUrl}

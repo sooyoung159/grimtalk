@@ -6,8 +6,8 @@ export function CharacterCard({ character, assistantText }: { character: T; assi
   const firstGreeting = character.greeting?.trim() || assistantText?.trim() || '안녕! 만나서 반가워!';
   const followUpQuestion = character.question?.trim();
   const identity = character.identity?.trim();
-  const traits = character.traits?.filter(Boolean) ?? [];
-  const showDetails = Boolean(identity || traits.length > 0 || (assistantText?.trim() && assistantText.trim() !== firstGreeting));
+  const hasTraits = character.traits?.some(Boolean);
+  const showDetails = Boolean(identity || hasTraits || (assistantText?.trim() && assistantText.trim() !== firstGreeting));
 
   return (
     <div className="space-y-3">
@@ -40,7 +40,7 @@ export function CharacterCard({ character, assistantText }: { character: T; assi
           <div className="mt-3 space-y-3">
             {identity && <p className="leading-relaxed">{identity}</p>}
 
-            {traits.length > 0 && <CharacterTraits traits={traits as [string, string]} />}
+            {hasTraits && <CharacterTraits traits={character.traits} />}
 
             {assistantText?.trim() && assistantText.trim() !== firstGreeting && (
               <div className="rounded-2xl bg-[#FFFBF4] px-4 py-3">
