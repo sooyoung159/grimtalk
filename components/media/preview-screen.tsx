@@ -10,7 +10,7 @@ export function PreviewScreen({ imageUrl, onRetake, onContinue }: { imageUrl: st
       <SectionTitle title="잘 찍혔어! 이 그림으로 깨워볼까?" description="친구가 잘 보이면 바로 다음 단계에서 말을 걸 수 있어." />
 
       <div className="space-y-2">
-        <CapturePreviewCard imageUrl={imageUrl} />
+        <CapturePreviewCard imageUrl={imageUrl} emptyMessage="여기에 네 그림이 나타날 거야" />
         <p className="text-xs text-[#9A8F83]">방금 찍은 그림이야. 마음에 들면 그대로 이어가자.</p>
       </div>
 

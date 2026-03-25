@@ -31,12 +31,10 @@ export function LoadingScreen({ message, imageUrl }: { imageUrl?: string | null;
 
   return (
     <div className="space-y-5 py-8 animate-result-enter">
-      {imageUrl && (
-        <div className="space-y-2">
-          <p className="text-center text-xs text-[#9A8F83]">네 그림 친구를 깨우는 중이야</p>
-          <CapturePreviewCard imageUrl={imageUrl} />
-        </div>
-      )}
+      <div className="space-y-2">
+        <p className="text-center text-xs text-[#9A8F83]">네 그림 친구를 깨우는 중이야</p>
+        <CapturePreviewCard imageUrl={imageUrl} emptyMessage="그림 친구를 기다리는 중이야" />
+      </div>
 
       <SectionTitle title={title} description="나나가 그림 친구에게 살짝 말을 걸고 있어." align="center" />
       <LoadingStars />

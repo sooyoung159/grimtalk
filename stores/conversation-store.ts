@@ -19,6 +19,12 @@ interface ConversationStore {
   clearMessages: () => void;
 }
 
+function normalizeForRecent(text: string, max = 120): string {
+  const oneLine = text.replace(/\s+/g, ' ').trim();
+  if (oneLine.length <= max) return oneLine;
+  return `${oneLine.slice(0, max - 1)}…`;
+}
+
 export const useConversationStore = create<ConversationStore>((set) => ({
   messages: [],
   turnCount: 0,
@@ -30,6 +36,8 @@ export const useConversationStore = create<ConversationStore>((set) => ({
       const nextTurn = s.turnCount + 1;
       const normalizedUserText = userText.trim() || '(사용자 발화 없음)';
       const normalizedAssistantText = assistantText.trim() || '(친구 응답 없음)';
+      const recentUser = normalizeForRecent(normalizedUserText, 80);
+      const recentAssistant = normalizeForRecent(normalizedAssistantText, 120);
 
       const userMessage: ConversationMessage = {
         id: `u-${nextTurn}-${Date.now()}`,
@@ -47,8 +55,8 @@ export const useConversationStore = create<ConversationStore>((set) => ({
 
       return {
         turnCount: nextTurn,
-        recentUserText: normalizedUserText,
-        recentAssistantText: normalizedAssistantText,
+        recentUserText: recentUser,
+        recentAssistantText: recentAssistant,
         messages: nextMessages,
       };
     }),

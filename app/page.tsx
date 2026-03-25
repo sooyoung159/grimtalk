@@ -16,17 +16,32 @@ import { useSessionStore } from '@/stores/session-store';
 import { useConversationStore } from '@/stores/conversation-store';
 import { getDefaultTextByMode } from '@/lib/kanana/build-request';
 
-function composeTurnText(mode: KananaInputMode, baseText: string, previousUser: string | null, previousAssistant: string | null): string {
-  if (!previousUser || !previousAssistant) return baseText;
+function trimContext(text: string | null, max: number): string | null {
+  if (!text) return null;
+  const normalized = text.replace(/\s+/g, ' ').trim();
+  if (!normalized) return null;
+  if (normalized.length <= max) return normalized;
+  return `${normalized.slice(0, max - 1)}…`;
+}
 
-  return [
-    baseText,
-    '',
-    '직전 대화 참고(최근 1턴):',
-    `- 사용자: ${previousUser}`,
-    `- 친구: ${previousAssistant}`,
-    '위 맥락은 참고만 하고, 이번 사용자 입력(특히 방금 음성)에 우선 반응해줘.',
-  ].join('\n');
+function composeTurnText(mode: KananaInputMode, baseText: string, previousUser: string | null, previousAssistant: string | null): string {
+  const compactUser = trimContext(previousUser, 80);
+  const compactAssistant = trimContext(previousAssistant, 120);
+
+  const sections: string[] = [
+    `이번 턴 목표:\n${baseText}`,
+    '이번 턴 우선 규칙:\n- 직전 대화는 참고만 하고, 지금 사용자의 마지막 발화(특히 방금 음성)에 먼저 반응해줘.\n- 이미 같은 친구로 대화 중이면 자기소개를 반복하지 마.',
+  ];
+
+  if (compactUser && compactAssistant) {
+    sections.splice(1, 0, ['최근 1턴 참고:', `- 사용자: ${compactUser}`, `- 친구: ${compactAssistant}`].join('\n'));
+  }
+
+  if (mode === 'image_audio') {
+    sections.push('추가 규칙:\n- 이미지 분위기를 유지하되, 이번 발화 반응을 가장 먼저 보여줘.');
+  }
+
+  return sections.join('\n\n');
 }
 
 function makeTranscriptKey(audioFile: File): string {
@@ -62,15 +77,11 @@ export default function HomePage() {
   const messages = useConversationStore((st) => st.messages);
   const [mode, setMode] = useState<KananaInputMode>('image_audio');
 
-  // NOTE: permission/recording 상태는 훅의 값을 직접 사용한다.
-  // store로 다시 미러링하면 dev 모드에서 불필요한 업데이트 루프를 유발할 수 있음.
-
   const extractUserUtterance = async (audioFile?: File): Promise<string | null> => {
     if (!audioFile) return null;
 
     const key = makeTranscriptKey(audioFile);
 
-    // 동일 오디오 파일이면 최근 1개 캐시 재사용
     if (recentTranscriptKey === key && recentTranscript) {
       return recentTranscript;
     }
@@ -150,7 +161,7 @@ export default function HomePage() {
     setStep(mode === 'audio_only' ? 'record' : 'camera');
   };
 
-  const showModeToggle = process.env.NODE_ENV !== 'production';
+  const showModeToggle = process.env.NODE_ENV !== 'production' && process.env.NEXT_PUBLIC_KANANA_MODE === 'mock';
 
   return (
     <AppShell>
@@ -187,7 +198,7 @@ export default function HomePage() {
       {step === 'loading' && <LoadingScreen imageUrl={capturedImage.previewUrl} />}
       {step === 'result' && currentCharacter && (
         <ResultScreen
-          imageUrl={capturedImage.previewUrl ?? '/logo.svg'}
+          imageUrl={capturedImage.previewUrl}
           character={currentCharacter}
           assistantText={assistantText}
           audioUrl={assistantAudioUrl}
