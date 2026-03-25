@@ -77,15 +77,11 @@ export default function HomePage() {
   const messages = useConversationStore((st) => st.messages);
   const [mode, setMode] = useState<KananaInputMode>('image_audio');
 
-  // NOTE: permission/recording 상태는 훅의 값을 직접 사용한다.
-  // store로 다시 미러링하면 dev 모드에서 불필요한 업데이트 루프를 유발할 수 있음.
-
   const extractUserUtterance = async (audioFile?: File): Promise<string | null> => {
     if (!audioFile) return null;
 
     const key = makeTranscriptKey(audioFile);
 
-    // 동일 오디오 파일이면 최근 1개 캐시 재사용
     if (recentTranscriptKey === key && recentTranscript) {
       return recentTranscript;
     }
@@ -165,7 +161,8 @@ export default function HomePage() {
     setStep(mode === 'audio_only' ? 'record' : 'camera');
   };
 
-  const showModeToggle = process.env.NODE_ENV !== 'production';
+  const isMockMode = process.env.NEXT_PUBLIC_KANANA_MODE === 'mock';
+  const showModeToggle = process.env.NODE_ENV !== 'production' && isMockMode;
 
   return (
     <AppShell>

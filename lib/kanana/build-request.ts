@@ -13,7 +13,7 @@ interface BuildKananaPayloadParams {
 
 export function getDefaultTextByMode(mode: KananaInputMode): string {
   if (mode === 'image_only') {
-    return '이미지 속 친구의 관점에서 짧고 따뜻하게 반응해줘. 설명만 하지 말고 마지막에 가벼운 질문 한 문장을 붙여줘.';
+    return '이미지 속 친구의 관점에서, 방금 막 살아난 것처럼 짧고 따뜻하게 첫 인사를 건네줘. 설명보다 만남의 장면이 먼저 느껴지게 하고, 마지막엔 가벼운 질문 한 문장을 붙여줘.';
   }
   if (mode === 'audio_only') {
     return '방금 사용자가 한 말을 가능한 그대로 한국어로 적어줘. 뜻을 바꾸거나 요약하지 말고, 들은 문장을 최대한 원문에 가깝게 한 문장으로 써줘.';
@@ -21,6 +21,7 @@ export function getDefaultTextByMode(mode: KananaInputMode): string {
 
   return [
     '이번 턴 목표: 이미지 속 친구가 되어, 방금 사용자의 말에 답해줘.',
+    '느낌: 예쁜 정보 정리가 아니라, 막 살아난 그림 친구와의 첫 만남 장면처럼 느껴지게 해줘.',
     '우선순위: 직전 대화는 참고만 하고, 이번 마지막 발화에 먼저 반응해줘.',
     '형식: 2~4문장, 짧고 따뜻하게, 마지막은 부담 없는 질문으로 끝내줘.',
   ].join('\n');
