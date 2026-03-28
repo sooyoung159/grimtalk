@@ -23,6 +23,7 @@ export interface SessionStore {
   capturedImage: CapturedImageState;
   recordedAudio: RecordedAudioState;
   currentCharacter: CharacterCard | null;
+  fixedCharacterProfile: CharacterCard | null;
   assistantText: string;
   assistantAudioUrl: string | null;
   errorMessage: string | null;
@@ -37,6 +38,7 @@ export interface SessionStore {
   setCapturedImage: (payload: CapturedImageState) => void;
   setRecordedAudio: (payload: RecordedAudioState) => void;
   setResult: (payload: { character: CharacterCard; assistantText: string; assistantAudioUrl: string | null }) => void;
+  setFixedCharacterProfile: (payload: CharacterCard | null) => void;
   setErrorMessage: (value: string | null) => void;
   setRecentTranscriptCache: (payload: { key: string; transcript: string }) => void;
   clearRecentTranscriptCache: () => void;

@@ -16,6 +16,7 @@ interface ConversationStore {
   recentAssistantText: string | null;
   addMessage: (message: ConversationMessage) => void;
   addTurn: (payload: { userText: string; assistantText: string; assistantAudioUrl?: string | null }) => void;
+  updateLastAssistantTurn: (payload: { assistantText: string; assistantAudioUrl?: string | null }) => void;
   clearMessages: () => void;
 }
 
@@ -58,6 +59,28 @@ export const useConversationStore = create<ConversationStore>((set) => ({
         recentUserText: recentUser,
         recentAssistantText: recentAssistant,
         messages: nextMessages,
+      };
+    }),
+  updateLastAssistantTurn: ({ assistantText, assistantAudioUrl }) =>
+    set((s) => {
+      if (!s.messages.length) return s;
+
+      const normalizedAssistantText = assistantText.trim() || '(친구 응답 없음)';
+      const updatedMessages = [...s.messages];
+      for (let i = updatedMessages.length - 1; i >= 0; i -= 1) {
+        if (updatedMessages[i].role === 'assistant') {
+          updatedMessages[i] = {
+            ...updatedMessages[i],
+            text: normalizedAssistantText,
+            audioUrl: assistantAudioUrl ?? null,
+          };
+          break;
+        }
+      }
+
+      return {
+        messages: updatedMessages,
+        recentAssistantText: normalizeForRecent(normalizedAssistantText, 120),
       };
     }),
   clearMessages: () => set({ messages: [], turnCount: 0, recentUserText: null, recentAssistantText: null }),
