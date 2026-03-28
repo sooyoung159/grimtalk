@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
-import { buildKananaPayload, KananaInputMode } from '@/lib/kanana/build-request';
+import { buildKananaPayload, KananaInputMode, KananaTurnMode } from '@/lib/kanana/build-request';
 import { parseKananaResponse } from '@/lib/kanana/parse-response';
 import { wrapPcm16ToWav } from '@/lib/media/audio';
+import { CharacterCard } from '@/types/character';
 
 const REQUEST_TIMEOUT_MS = 20000;
 const ALLOWED_IMAGE_MIME = new Set(['image/jpeg', 'image/png', 'image/webp']);
@@ -95,6 +96,68 @@ function parseMode(v: FormDataEntryValue | null): KananaInputMode {
   return 'image_audio';
 }
 
+function parseTurnMode(v: FormDataEntryValue | null): KananaTurnMode {
+  if (typeof v !== 'string') return 'first_turn';
+  return v === 'continue_turn' ? 'continue_turn' : 'first_turn';
+}
+
+function parseCharacter(v: FormDataEntryValue | null): CharacterCard | null {
+  if (typeof v !== 'string') return null;
+  try {
+    const parsed = JSON.parse(v);
+    if (
+      isRecord(parsed) &&
+      typeof parsed.name === 'string' &&
+      typeof parsed.identity === 'string' &&
+      Array.isArray(parsed.traits) &&
+      parsed.traits.length >= 2 &&
+      typeof parsed.voiceTone === 'string' &&
+      typeof parsed.greeting === 'string' &&
+      typeof parsed.question === 'string'
+    ) {
+      return {
+        name: parsed.name,
+        identity: parsed.identity,
+        traits: [String(parsed.traits[0]), String(parsed.traits[1])],
+        voiceTone: parsed.voiceTone,
+        greeting: parsed.greeting,
+        question: parsed.question,
+        narration: typeof parsed.narration === 'string' ? parsed.narration : undefined,
+      };
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+const BANNED_IDENTITY_PATTERNS = [
+  /나는\s*카카오에서\s*온\s*ai/i,
+  /나는\s*카나나/i,
+  /카카오의\s*도우미/i,
+  /ai\s*카나나/i,
+  /인공지능/i,
+  /ai\s*비서/i,
+];
+
+function sanitizeAssistantText(text: string, character: CharacterCard, turnMode: KananaTurnMode): string {
+  const normalized = text.replace(/\s+/g, ' ').trim();
+  if (!normalized) {
+    return turnMode === 'continue_turn'
+      ? `${character.name}답게 이어서 말해볼게. 우리 다음엔 무엇을 해볼까?`
+      : `${character.greeting} ${character.question}`;
+  }
+
+  if (BANNED_IDENTITY_PATTERNS.some((pattern) => pattern.test(normalized))) {
+    if (turnMode === 'continue_turn') {
+      return `${character.name}인 내가 방금 네 말을 듣고 더 가까이 왔어. ${character.question}`;
+    }
+    return `${character.greeting} ${character.question}`;
+  }
+
+  return normalized;
+}
+
 export async function POST(req: Request) {
   try {
     const endpointRaw = process.env.KANANA_BASE_URL ?? '';
@@ -111,11 +174,15 @@ export async function POST(req: Request) {
 
     const formData = await req.formData();
     const mode = parseMode(formData.get('mode'));
+    const turnMode = parseTurnMode(formData.get('turnMode'));
+    const character = parseCharacter(formData.get('character'));
+    const previousUserText = (formData.get('previousUserText') as string | null) ?? undefined;
+    const previousAssistantText = (formData.get('previousAssistantText') as string | null) ?? undefined;
     const image = formData.get('image');
     const audio = formData.get('audio');
     const text = (formData.get('text') as string | null) ?? undefined;
 
-    const needsImage = mode === 'image_only' || mode === 'image_audio';
+    const needsImage = turnMode === 'first_turn' && (mode === 'image_only' || mode === 'image_audio');
     const needsAudio = mode === 'audio_only' || mode === 'image_audio';
 
     if (needsImage && !isFile(image)) {
@@ -148,6 +215,7 @@ export async function POST(req: Request) {
 
       debugLog('audio input passthrough', {
         mode,
+        turnMode,
         mimeType: audio.type,
         byteSize: audio.size,
       });
@@ -155,6 +223,10 @@ export async function POST(req: Request) {
 
     const requestBody = buildKananaPayload({
       mode,
+      turnMode,
+      character,
+      previousUserText,
+      previousAssistantText,
       imageBase64,
       imageMimeType,
       audioBase64: requestAudioBase64,
@@ -164,8 +236,12 @@ export async function POST(req: Request) {
 
     debugLog('upstream request summary', {
       mode,
+      turnMode,
       hasImage: Boolean(imageBase64),
       hasAudio: Boolean(requestAudioBase64),
+      hasCharacter: Boolean(character),
+      hasPreviousUserText: Boolean(previousUserText),
+      hasPreviousAssistantText: Boolean(previousAssistantText),
       textLength: text?.trim().length ?? 0,
     });
 
@@ -194,6 +270,7 @@ export async function POST(req: Request) {
 
     debugLog('upstream status', {
       mode,
+      turnMode,
       status: upstream.status,
       ok: upstream.ok,
       contentType: upstream.headers.get('content-type'),
@@ -202,6 +279,7 @@ export async function POST(req: Request) {
     const upstreamText = await upstream.text();
     debugLog('upstream raw response preview', {
       mode,
+      turnMode,
       length: upstreamText.length,
       preview: safeBase64Preview(upstreamText, 800),
     });
@@ -219,6 +297,8 @@ export async function POST(req: Request) {
     }
 
     const parsed = parseKananaResponse(raw);
+    const resolvedCharacter = turnMode === 'continue_turn' && character ? character : parsed.character;
+    const resolvedAssistantText = sanitizeAssistantText(parsed.assistantText, resolvedCharacter, turnMode);
 
     let responseAudioBase64 = parsed.audioBase64;
     let responseAudioMimeType = parsed.audioMimeType;
@@ -238,6 +318,7 @@ export async function POST(req: Request) {
 
         debugLog('response audio wrapped', {
           mode,
+          turnMode,
           sourcePath: detectResponseAudioSourcePath(raw),
           decodedPcmByteLength: pcmBuffer.length,
           wrappedWavByteLength: wavBuffer.length,
@@ -245,6 +326,7 @@ export async function POST(req: Request) {
       } catch {
         debugLog('response audio wrap failed', {
           mode,
+          turnMode,
           sourcePath: detectResponseAudioSourcePath(raw),
           parsedAudioMimeType: parsed.audioMimeType,
         });
@@ -253,8 +335,8 @@ export async function POST(req: Request) {
 
     return NextResponse.json({
       ok: true,
-      character: parsed.character,
-      assistantText: parsed.assistantText,
+      character: resolvedCharacter,
+      assistantText: resolvedAssistantText,
       audioBase64: responseAudioBase64,
       audioMimeType: responseAudioMimeType,
     });
