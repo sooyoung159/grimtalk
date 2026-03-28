@@ -104,13 +104,41 @@ function parseTurnMode(v: FormDataEntryValue | null): KananaTurnMode {
 function parseCharacter(v: FormDataEntryValue | null): CharacterCard | null {
   if (typeof v !== 'string') return null;
   try {
-    const parsed = JSON.parse(v) as CharacterCard;
-    if (!parsed?.name) return null;
-    return parsed;
+    const parsed = JSON.parse(v);
+    if (
+      isRecord(parsed) &&
+      typeof parsed.name === 'string' &&
+      typeof parsed.identity === 'string' &&
+      Array.isArray(parsed.traits) &&
+      parsed.traits.length >= 2 &&
+      typeof parsed.voiceTone === 'string' &&
+      typeof parsed.greeting === 'string' &&
+      typeof parsed.question === 'string'
+    ) {
+      return {
+        name: parsed.name,
+        identity: parsed.identity,
+        traits: [String(parsed.traits[0]), String(parsed.traits[1])],
+        voiceTone: parsed.voiceTone,
+        greeting: parsed.greeting,
+        question: parsed.question,
+        narration: typeof parsed.narration === 'string' ? parsed.narration : undefined,
+      };
+    }
+    return null;
   } catch {
     return null;
   }
 }
+
+const BANNED_IDENTITY_PATTERNS = [
+  /나는\s*카카오에서\s*온\s*ai/i,
+  /나는\s*카나나/i,
+  /카카오의\s*도우미/i,
+  /ai\s*카나나/i,
+  /인공지능/i,
+  /ai\s*비서/i,
+];
 
 function sanitizeAssistantText(text: string, character: CharacterCard, turnMode: KananaTurnMode): string {
   const normalized = text.replace(/\s+/g, ' ').trim();
@@ -120,16 +148,7 @@ function sanitizeAssistantText(text: string, character: CharacterCard, turnMode:
       : `${character.greeting} ${character.question}`;
   }
 
-  const bannedPatterns = [
-    /나는\s*카카오에서\s*온\s*ai/i,
-    /나는\s*카나나/i,
-    /카카오의\s*도우미/i,
-    /ai\s*카나나/i,
-    /인공지능/i,
-    /ai\s*비서/i,
-  ];
-
-  if (bannedPatterns.some((pattern) => pattern.test(normalized))) {
+  if (BANNED_IDENTITY_PATTERNS.some((pattern) => pattern.test(normalized))) {
     if (turnMode === 'continue_turn') {
       return `${character.name}인 내가 방금 네 말을 듣고 더 가까이 왔어. ${character.question}`;
     }
