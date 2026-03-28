@@ -46,6 +46,7 @@ export default function HomePage() {
   const kanana = useKananaRequest();
   const clearMessages = useConversationStore((st) => st.clearMessages);
   const addTurn = useConversationStore((st) => st.addTurn);
+  const updateLastAssistantTurn = useConversationStore((st) => st.updateLastAssistantTurn);
   const recentUserText = useConversationStore((st) => st.recentUserText);
   const recentAssistantText = useConversationStore((st) => st.recentAssistantText);
   const messages = useConversationStore((st) => st.messages);
@@ -113,6 +114,12 @@ export default function HomePage() {
         assistantAudioUrl: null,
       });
 
+      addTurn({
+        userText: normalizedUserText,
+        assistantText: '...',
+        assistantAudioUrl: null,
+      });
+
       const result = await kanana.submitContinueTurn({
         audio: audioFile,
         character: fixedCharacterProfile,
@@ -121,8 +128,7 @@ export default function HomePage() {
       });
 
       setResult({ character: fixedCharacterProfile, assistantText: result.assistantText, assistantAudioUrl: result.audioUrl });
-      addTurn({
-        userText: normalizedUserText,
+      updateLastAssistantTurn({
         assistantText: result.assistantText,
         assistantAudioUrl: result.audioUrl,
       });
