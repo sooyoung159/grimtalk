@@ -11,38 +11,11 @@ import { ResultScreen } from '@/components/result/result-screen';
 import { ConversationScreen } from '@/components/conversation/conversation-screen';
 import { useMediaCapture } from '@/hooks/use-media-capture';
 import { useAudioRecorder } from '@/hooks/use-audio-recorder';
-import { useKananaRequest, KananaInputMode } from '@/hooks/use-kanana-request';
+import { useKananaRequest } from '@/hooks/use-kanana-request';
+import { KananaInputMode } from '@/lib/kanana/build-request';
 import { useSessionStore } from '@/stores/session-store';
 import { useConversationStore } from '@/stores/conversation-store';
 import { getDefaultTextByMode } from '@/lib/kanana/build-request';
-
-function trimContext(text: string | null, max: number): string | null {
-  if (!text) return null;
-  const normalized = text.replace(/\s+/g, ' ').trim();
-  if (!normalized) return null;
-  if (normalized.length <= max) return normalized;
-  return `${normalized.slice(0, max - 1)}…`;
-}
-
-function composeTurnText(mode: KananaInputMode, baseText: string, previousUser: string | null, previousAssistant: string | null): string {
-  const compactUser = trimContext(previousUser, 80);
-  const compactAssistant = trimContext(previousAssistant, 120);
-
-  const sections: string[] = [
-    `이번 턴 목표:\n${baseText}`,
-    '이번 턴 우선 규칙:\n- 직전 대화는 참고만 하고, 지금 사용자의 마지막 발화(특히 방금 음성)에 먼저 반응해줘.\n- 이미 같은 친구로 대화 중이면 자기소개를 반복하지 마.',
-  ];
-
-  if (compactUser && compactAssistant) {
-    sections.splice(1, 0, ['최근 1턴 참고:', `- 사용자: ${compactUser}`, `- 친구: ${compactAssistant}`].join('\n'));
-  }
-
-  if (mode === 'image_audio') {
-    sections.push('추가 규칙:\n- 이미지 분위기를 유지하되, 이번 발화 반응을 가장 먼저 보여줘.');
-  }
-
-  return sections.join('\n\n');
-}
 
 function makeTranscriptKey(audioFile: File): string {
   return [audioFile.name, audioFile.size, audioFile.type, audioFile.lastModified].join(':');
@@ -52,6 +25,7 @@ export default function HomePage() {
   const step = useSessionStore((st) => st.step);
   const capturedImage = useSessionStore((st) => st.capturedImage);
   const currentCharacter = useSessionStore((st) => st.currentCharacter);
+  const fixedCharacterProfile = useSessionStore((st) => st.fixedCharacterProfile);
   const assistantText = useSessionStore((st) => st.assistantText);
   const assistantAudioUrl = useSessionStore((st) => st.assistantAudioUrl);
   const errorMessage = useSessionStore((st) => st.errorMessage);
@@ -101,16 +75,14 @@ export default function HomePage() {
     }
   };
 
-  const submitByMode = async (payload: { image?: File; audioFile?: File }) => {
+  const submitFirstTurn = async (payload: { image?: File; audioFile?: File }) => {
     setStep('loading');
     setSubmitting(true);
     try {
-      const baseText = getDefaultTextByMode(mode);
-      const requestText = composeTurnText(mode, baseText, recentUserText, recentAssistantText);
-
+      const baseText = getDefaultTextByMode(mode, 'first_turn');
       const extractedUserUtterance = await extractUserUtterance(payload.audioFile);
 
-      const result = await kanana.submitFirstTurn({ image: payload.image, audio: payload.audioFile, mode, text: requestText });
+      const result = await kanana.submitFirstTurn({ image: payload.image, audio: payload.audioFile, mode, text: baseText });
       setResult({ character: result.character, assistantText: result.assistantText, assistantAudioUrl: result.audioUrl });
       addTurn({
         userText: extractedUserUtterance ?? (mode === 'image_only' ? '이미지 설명 요청' : baseText),
@@ -126,6 +98,43 @@ export default function HomePage() {
     }
   };
 
+  const submitContinueTurn = async (audioFile: File) => {
+    if (!fixedCharacterProfile) return;
+
+    setStep('loading');
+    setSubmitting(true);
+    try {
+      const extractedUserUtterance = await extractUserUtterance(audioFile);
+      const normalizedUserText = extractedUserUtterance ?? '(방금 한 말 인식 실패)';
+
+      addTurn({
+        userText: normalizedUserText,
+        assistantText: '...',
+        assistantAudioUrl: null,
+      });
+
+      const result = await kanana.submitContinueTurn({
+        audio: audioFile,
+        character: fixedCharacterProfile,
+        previousUserText: recentUserText,
+        previousAssistantText: recentAssistantText,
+      });
+
+      setResult({ character: fixedCharacterProfile, assistantText: result.assistantText, assistantAudioUrl: result.audioUrl });
+      addTurn({
+        userText: normalizedUserText,
+        assistantText: result.assistantText,
+        assistantAudioUrl: result.audioUrl,
+      });
+      setStep('result');
+    } catch (e) {
+      setErrorMessage(e instanceof Error ? e.message : '친구가 말을 잇지 못했어. 한 번 더 해볼까?');
+      setStep('record');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   const handleCapture = async () => {
     const captured = await media.captureFrame();
     if (!captured) return;
@@ -136,7 +145,7 @@ export default function HomePage() {
   const handlePreviewContinue = async () => {
     if (mode === 'image_only') {
       if (!capturedImage.file) return;
-      await submitByMode({ image: capturedImage.file });
+      await submitFirstTurn({ image: capturedImage.file });
       return;
     }
     setStep('record');
@@ -148,13 +157,18 @@ export default function HomePage() {
 
     setRecordedAudio(recorded);
 
+    if (fixedCharacterProfile) {
+      await submitContinueTurn(recorded.file);
+      return;
+    }
+
     if (mode === 'audio_only') {
-      await submitByMode({ audioFile: recorded.file });
+      await submitFirstTurn({ audioFile: recorded.file });
       return;
     }
 
     if (!capturedImage.file) return;
-    await submitByMode({ image: capturedImage.file, audioFile: recorded.file });
+    await submitFirstTurn({ image: capturedImage.file, audioFile: recorded.file });
   };
 
   const handleStart = () => {
@@ -183,19 +197,21 @@ export default function HomePage() {
       {step === 'landing' && <LandingScreen onStart={handleStart} />}
       {step === 'camera' && <CameraScreen permission={media.permission} isCameraReady={media.isReady} videoRef={media.videoRef} errorMessage={media.error ?? errorMessage} onRequestCamera={media.requestCamera} onCapture={handleCapture} onBack={() => setStep('landing')} />}
       {step === 'preview' && capturedImage.previewUrl && <PreviewScreen imageUrl={capturedImage.previewUrl} onRetake={() => setStep('camera')} onContinue={handlePreviewContinue} />}
-      {step === 'record' && (mode === 'audio_only' || capturedImage.previewUrl) && (
+      {step === 'record' && (mode === 'audio_only' || capturedImage.previewUrl || fixedCharacterProfile) && (
         <RecordScreen
           imageUrl={capturedImage.previewUrl ?? '/logo.svg'}
           permission={audio.permission}
           isRecording={audio.isRecording}
           errorMessage={audio.error ?? errorMessage}
+          mode={fixedCharacterProfile ? 'continue_turn' : 'first_turn'}
+          recentMessages={messages}
           onRequestMic={audio.requestMic}
           onStartRecording={audio.startRecording}
           onStopRecording={handleStopRecording}
-          onBack={() => setStep(mode === 'audio_only' ? 'landing' : 'preview')}
+          onBack={() => setStep(fixedCharacterProfile ? 'result' : mode === 'audio_only' ? 'landing' : 'preview')}
         />
       )}
-      {step === 'loading' && <LoadingScreen imageUrl={capturedImage.previewUrl} />}
+      {step === 'loading' && <LoadingScreen imageUrl={capturedImage.previewUrl} turnMode={fixedCharacterProfile && messages.length > 0 ? 'continue_turn' : 'first_turn'} />}
       {step === 'result' && currentCharacter && (
         <ResultScreen
           imageUrl={capturedImage.previewUrl}
@@ -203,7 +219,7 @@ export default function HomePage() {
           assistantText={assistantText}
           audioUrl={assistantAudioUrl}
           recentMessages={messages}
-          onTalkAgain={() => setStep(mode === 'audio_only' ? 'record' : mode === 'image_only' ? 'preview' : 'record')}
+          onTalkAgain={() => setStep('record')}
           onRestart={() => {
             resetSession();
             clearMessages();

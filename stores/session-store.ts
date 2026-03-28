@@ -13,6 +13,7 @@ const initial = {
   capturedImage: { file: null, previewUrl: null },
   recordedAudio: { file: null, previewUrl: null, durationMs: null },
   currentCharacter: null,
+  fixedCharacterProfile: null,
   assistantText: '',
   assistantAudioUrl: null,
   errorMessage: null,
@@ -30,7 +31,9 @@ export const useSessionStore = create<SessionStore>((set) => ({
   setSubmitting: (isSubmitting) => set({ isSubmitting }),
   setCapturedImage: (capturedImage) => set({ capturedImage }),
   setRecordedAudio: (recordedAudio) => set({ recordedAudio }),
-  setResult: ({ character, assistantText, assistantAudioUrl }) => set({ currentCharacter: character, assistantText, assistantAudioUrl }),
+  setResult: ({ character, assistantText, assistantAudioUrl }) =>
+    set({ currentCharacter: character, fixedCharacterProfile: character, assistantText, assistantAudioUrl }),
+  setFixedCharacterProfile: (fixedCharacterProfile) => set({ fixedCharacterProfile }),
   setErrorMessage: (errorMessage) => set({ errorMessage }),
   setRecentTranscriptCache: ({ key, transcript }) => set({ recentTranscriptKey: key, recentTranscript: transcript }),
   clearRecentTranscriptCache: () => set({ recentTranscriptKey: null, recentTranscript: null }),
