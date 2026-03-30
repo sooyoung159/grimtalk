@@ -148,6 +148,17 @@ export default function HomePage() {
     setStep('preview');
   };
 
+  const handlePickFromLibrary = () => {
+    media.openFilePicker();
+  };
+
+  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const selected = await media.handleFileChange(event);
+    if (!selected) return;
+    setCapturedImage(selected);
+    setStep('preview');
+  };
+
   const handlePreviewContinue = async () => {
     if (mode === 'image_only') {
       if (!capturedImage.file) return;
@@ -201,7 +212,20 @@ export default function HomePage() {
       )}
 
       {step === 'landing' && <LandingScreen onStart={handleStart} />}
-      {step === 'camera' && <CameraScreen permission={media.permission} isCameraReady={media.isReady} videoRef={media.videoRef} errorMessage={media.error ?? errorMessage} onRequestCamera={media.requestCamera} onCapture={handleCapture} onBack={() => setStep('landing')} />}
+      {step === 'camera' && (
+        <CameraScreen
+          permission={media.permission}
+          isCameraReady={media.isReady}
+          videoRef={media.videoRef}
+          fileInputRef={media.fileInputRef}
+          errorMessage={media.error ?? errorMessage}
+          onRequestCamera={media.requestCamera}
+          onCapture={handleCapture}
+          onPickFromLibrary={handlePickFromLibrary}
+          onFileChange={handleFileChange}
+          onBack={() => setStep('landing')}
+        />
+      )}
       {step === 'preview' && capturedImage.previewUrl && <PreviewScreen imageUrl={capturedImage.previewUrl} onRetake={() => setStep('camera')} onContinue={handlePreviewContinue} />}
       {step === 'record' && (mode === 'audio_only' || capturedImage.previewUrl || fixedCharacterProfile) && (
         <RecordScreen

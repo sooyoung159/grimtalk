@@ -21,6 +21,13 @@ const initial = {
   recentTranscriptKey: null,
 } as const;
 
+function revokeObjectUrl(url: string | null) {
+  if (!url) return;
+  if (url.startsWith('blob:')) {
+    URL.revokeObjectURL(url);
+  }
+}
+
 export const useSessionStore = create<SessionStore>((set) => ({
   ...initial,
   setStep: (step) => set({ step }),
@@ -29,7 +36,13 @@ export const useSessionStore = create<SessionStore>((set) => ({
   setCameraReady: (isCameraReady) => set({ isCameraReady }),
   setRecording: (isRecording) => set({ isRecording }),
   setSubmitting: (isSubmitting) => set({ isSubmitting }),
-  setCapturedImage: (capturedImage) => set({ capturedImage }),
+  setCapturedImage: (capturedImage) =>
+    set((state) => {
+      if (state.capturedImage.previewUrl !== capturedImage.previewUrl) {
+        revokeObjectUrl(state.capturedImage.previewUrl);
+      }
+      return { capturedImage };
+    }),
   setRecordedAudio: (recordedAudio) => set({ recordedAudio }),
   setResult: ({ character, assistantText, assistantAudioUrl }) =>
     set({ currentCharacter: character, fixedCharacterProfile: character, assistantText, assistantAudioUrl }),
@@ -37,5 +50,9 @@ export const useSessionStore = create<SessionStore>((set) => ({
   setErrorMessage: (errorMessage) => set({ errorMessage }),
   setRecentTranscriptCache: ({ key, transcript }) => set({ recentTranscriptKey: key, recentTranscript: transcript }),
   clearRecentTranscriptCache: () => set({ recentTranscriptKey: null, recentTranscript: null }),
-  resetSession: () => set({ ...initial }),
+  resetSession: () =>
+    set((state) => {
+      revokeObjectUrl(state.capturedImage.previewUrl);
+      return { ...initial };
+    }),
 }));
