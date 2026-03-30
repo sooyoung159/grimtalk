@@ -1,9 +1,10 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { ChangeEvent, useCallback, useEffect, useRef, useState } from 'react';
 
 export function useMediaCapture() {
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const [permission, setPermission] = useState<'idle' | 'granted' | 'denied'>('idle');
   const [isReady, setIsReady] = useState(false);
@@ -38,6 +39,11 @@ export function useMediaCapture() {
     }
   };
 
+  const buildImageState = async (source: Blob, filename: string, type: string) => {
+    const file = source instanceof File ? source : new File([source], filename, { type });
+    return { file, previewUrl: URL.createObjectURL(file) };
+  };
+
   const captureFrame = async () => {
     if (!videoRef.current) return null;
     const { videoWidth, videoHeight } = videoRef.current;
@@ -56,9 +62,26 @@ export function useMediaCapture() {
     const blob = await new Promise<Blob | null>((res) => canvas.toBlob(res, 'image/jpeg', 0.92));
     if (!blob) return null;
 
-    const file = new File([blob], `capture-${Date.now()}.jpg`, { type: 'image/jpeg' });
-    // TODO: previewUrl(object URL) revoke는 소비 레이어(store/page)에서 교체 시점에 정리 필요
-    return { file, previewUrl: URL.createObjectURL(file) };
+    return buildImageState(blob, `capture-${Date.now()}.jpg`, 'image/jpeg');
+  };
+
+  const openFilePicker = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+
+    if (!file) return null;
+    if (!file.type.startsWith('image/')) {
+      setError('그림이 잘 보이는 사진을 골라줘!');
+      return null;
+    }
+
+    stopCamera();
+    setError(null);
+    return buildImageState(file, file.name || `upload-${Date.now()}.jpg`, file.type || 'image/jpeg');
   };
 
   useEffect(() => {
@@ -67,5 +90,5 @@ export function useMediaCapture() {
     };
   }, [stopCamera]);
 
-  return { videoRef, permission, isReady, error, requestCamera, captureFrame, stopCamera };
+  return { videoRef, fileInputRef, permission, isReady, error, requestCamera, captureFrame, openFilePicker, handleFileChange, stopCamera };
 }
