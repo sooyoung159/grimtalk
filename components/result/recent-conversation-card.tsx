@@ -10,7 +10,7 @@ export function RecentConversationCard({ messages }: { messages: ConversationMes
       </summary>
 
       <div className="mt-3 space-y-2">
-        {messages.map((m) => {
+        {messages.filter((m) => m.text.trim() !== '...').map((m) => {
           const isUser = m.role === 'user';
           return (
             <div
