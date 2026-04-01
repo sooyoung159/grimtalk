@@ -88,8 +88,11 @@ export function buildKananaPayload(params: BuildKananaPayloadParams) {
 
     const sections = [baseText];
     if (profile) sections.push(profile);
-    if (compactUser && compactAssistant) {
-      sections.push(['최근 1턴 참고:', `- 사용자: ${compactUser}`, `- 친구: ${compactAssistant}`].join('\n'));
+    if (compactAssistant) {
+      const lines = ['최근 1턴 참고:'];
+      if (compactUser) lines.push(`- 사용자: ${compactUser}`);
+      lines.push(`- 친구: ${compactAssistant}`);
+      sections.push(lines.join('\n'));
     }
     sections.push('이번 턴 우선 규칙:\n- 같은 친구처럼 자연스럽게 이어서 말해줘.\n- 자기소개를 반복하지 마.\n- 이번 마지막 발화 반응을 가장 먼저 보여줘.');
 

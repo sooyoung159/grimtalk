@@ -56,8 +56,8 @@ export default function HomePage() {
     if (!audioFile) return null;
 
     const key = makeTranscriptKey(audioFile);
-    if (recentTranscriptKey === key && recentTranscript) {
-      return recentTranscript;
+    if (recentTranscriptKey === key && recentTranscript !== null) {
+      return recentTranscript || null;
     }
 
     setRecentTranscriptCache({ key, transcript: '' });
