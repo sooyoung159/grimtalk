@@ -1,11 +1,21 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { Card } from '@/components/common/card';
+
+function getSafeAudioUrl(url?: string | null): string | null {
+  const trimmed = url?.trim();
+  if (!trimmed) return null;
+
+  const prefixes = ['data:audio/', 'blob:', 'http://', 'https://'];
+  const isPlayable = prefixes.some((prefix) => trimmed.startsWith(prefix));
+  return isPlayable ? trimmed : null;
+}
 
 export function AudioPlayer({ audioUrl }: { audioUrl?: string | null }) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
+  const safeAudioUrl = useMemo(() => getSafeAudioUrl(audioUrl), [audioUrl]);
 
   const handleToggle = async () => {
     if (!audioRef.current) return;
@@ -24,7 +34,7 @@ export function AudioPlayer({ audioUrl }: { audioUrl?: string | null }) {
     }
   };
 
-  if (!audioUrl) {
+  if (!safeAudioUrl) {
     return (
       <Card variant="base" className="space-y-1.5 p-4">
         <p className="text-xs font-semibold tracking-wide text-[#8B8177]">친구 목소리</p>
@@ -53,14 +63,14 @@ export function AudioPlayer({ audioUrl }: { audioUrl?: string | null }) {
       </div>
 
       <audio
+        key={safeAudioUrl}
         ref={audioRef}
+        src={safeAudioUrl}
         className="hidden"
         onEnded={() => setIsPlaying(false)}
         onPause={() => setIsPlaying(false)}
         onPlay={() => setIsPlaying(true)}
-      >
-        <source src={audioUrl} />
-      </audio>
+      />
     </Card>
   );
 }
