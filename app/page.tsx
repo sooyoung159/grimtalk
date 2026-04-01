@@ -56,24 +56,13 @@ export default function HomePage() {
     if (!audioFile) return null;
 
     const key = makeTranscriptKey(audioFile);
-
     if (recentTranscriptKey === key && recentTranscript) {
       return recentTranscript;
     }
 
-    try {
-      const transcript = await kanana.submitFirstTurn({
-        audio: audioFile,
-        mode: 'audio_only',
-      });
-      const t = transcript.assistantText?.trim();
-      if (!t) return null;
-
-      setRecentTranscriptCache({ key, transcript: t });
-      return t;
-    } catch {
-      return null;
-    }
+    const fallback = '방금 네가 친구에게 말을 걸었어.';
+    setRecentTranscriptCache({ key, transcript: fallback });
+    return fallback;
   };
 
   const submitFirstTurn = async (payload: { image?: File; audioFile?: File }) => {
