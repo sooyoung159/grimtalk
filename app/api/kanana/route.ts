@@ -304,7 +304,8 @@ export async function POST(req: Request) {
 
     let responseAudioBase64 = parsed.audioBase64;
     let responseAudioMimeType = parsed.audioMimeType;
-    const assistantTextWasSanitized = resolvedAssistantText !== parsed.assistantText;
+    const normalizedParsedAssistantText = parsed.assistantText.replace(/\s+/g, ' ').trim();
+    const assistantTextWasSanitized = resolvedAssistantText !== normalizedParsedAssistantText;
 
     if (assistantTextWasSanitized) {
       responseAudioBase64 = null;
