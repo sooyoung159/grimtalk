@@ -140,6 +140,31 @@ const BANNED_IDENTITY_PATTERNS = [
   /ai\s*비서/i,
 ];
 
+function alignCharacterToAssistantText(character: CharacterCard, assistantText: string): CharacterCard {
+  const normalized = assistantText.replace(/\s+/g, ' ').trim();
+  const patterns = [
+    /내 이름은\s*([가-힣A-Za-z0-9]{2,12})/,
+    /나는\s*([가-힣A-Za-z0-9]{2,12})야/,
+    /나는\s*([가-힣A-Za-z0-9]{2,12})라고\s*해/,
+  ];
+
+  for (const pattern of patterns) {
+    const match = normalized.match(pattern);
+    if (match?.[1]) {
+      const extractedName = match[1].trim();
+      if (extractedName && extractedName !== '카나나' && extractedName !== character.name) {
+        return {
+          ...character,
+          name: extractedName,
+          greeting: `안녕! 나는 ${extractedName}야!`,
+        };
+      }
+    }
+  }
+
+  return character;
+}
+
 function buildSafeAssistantText(character: CharacterCard, turnMode: KananaTurnMode): string {
   if (turnMode === 'continue_turn') {
     return `${character.name}인 내가 방금 네 말을 듣고 더 가까이 왔어. ${character.question}`;
@@ -299,8 +324,10 @@ export async function POST(req: Request) {
     }
 
     const parsed = parseKananaResponse(raw);
-    const resolvedCharacter = turnMode === 'continue_turn' && character ? character : parsed.character;
-    const resolvedAssistantText = sanitizeAssistantText(parsed.assistantText, resolvedCharacter, turnMode);
+    const baseCharacter = turnMode === 'continue_turn' && character ? character : parsed.character;
+    const alignedCharacter = turnMode === 'continue_turn' ? baseCharacter : alignCharacterToAssistantText(baseCharacter, parsed.assistantText);
+    const resolvedAssistantText = sanitizeAssistantText(parsed.assistantText, alignedCharacter, turnMode);
+    const resolvedCharacter = alignCharacterToAssistantText(alignedCharacter, resolvedAssistantText);
 
     let responseAudioBase64 = parsed.audioBase64;
     let responseAudioMimeType = parsed.audioMimeType;
