@@ -325,9 +325,8 @@ export async function POST(req: Request) {
 
     const parsed = parseKananaResponse(raw);
     const baseCharacter = turnMode === 'continue_turn' && character ? character : parsed.character;
-    const alignedCharacter = turnMode === 'continue_turn' ? baseCharacter : alignCharacterToAssistantText(baseCharacter, parsed.assistantText);
-    const resolvedAssistantText = sanitizeAssistantText(parsed.assistantText, alignedCharacter, turnMode);
-    const resolvedCharacter = alignCharacterToAssistantText(alignedCharacter, resolvedAssistantText);
+    const resolvedAssistantText = sanitizeAssistantText(parsed.assistantText, baseCharacter, turnMode);
+    const resolvedCharacter = turnMode === 'first_turn' ? alignCharacterToAssistantText(baseCharacter, resolvedAssistantText) : baseCharacter;
 
     let responseAudioBase64 = parsed.audioBase64;
     let responseAudioMimeType = parsed.audioMimeType;
