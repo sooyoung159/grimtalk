@@ -3,17 +3,19 @@
 import { useMemo, useRef, useState } from 'react';
 import { Card } from '@/components/common/card';
 
-function isPlayableAudioUrl(url?: string | null): boolean {
-  if (!url) return false;
-  const trimmed = url.trim();
-  if (!trimmed) return false;
-  return trimmed.startsWith('data:audio/') || trimmed.startsWith('blob:') || trimmed.startsWith('http://') || trimmed.startsWith('https://');
+function getSafeAudioUrl(url?: string | null): string | null {
+  const trimmed = url?.trim();
+  if (!trimmed) return null;
+
+  const prefixes = ['data:audio/', 'blob:', 'http://', 'https://'];
+  const isPlayable = prefixes.some((prefix) => trimmed.startsWith(prefix));
+  return isPlayable ? trimmed : null;
 }
 
 export function AudioPlayer({ audioUrl }: { audioUrl?: string | null }) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
-  const safeAudioUrl = useMemo(() => (isPlayableAudioUrl(audioUrl) ? audioUrl!.trim() : null), [audioUrl]);
+  const safeAudioUrl = useMemo(() => getSafeAudioUrl(audioUrl), [audioUrl]);
 
   const handleToggle = async () => {
     if (!audioRef.current) return;
@@ -61,14 +63,14 @@ export function AudioPlayer({ audioUrl }: { audioUrl?: string | null }) {
       </div>
 
       <audio
+        key={safeAudioUrl}
         ref={audioRef}
+        src={safeAudioUrl}
         className="hidden"
         onEnded={() => setIsPlaying(false)}
         onPause={() => setIsPlaying(false)}
         onPlay={() => setIsPlaying(true)}
-      >
-        <source src={safeAudioUrl} />
-      </audio>
+      />
     </Card>
   );
 }
