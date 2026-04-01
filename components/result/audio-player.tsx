@@ -1,11 +1,19 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { Card } from '@/components/common/card';
+
+function isPlayableAudioUrl(url?: string | null): boolean {
+  if (!url) return false;
+  const trimmed = url.trim();
+  if (!trimmed) return false;
+  return trimmed.startsWith('data:audio/') || trimmed.startsWith('blob:') || trimmed.startsWith('http://') || trimmed.startsWith('https://');
+}
 
 export function AudioPlayer({ audioUrl }: { audioUrl?: string | null }) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
+  const safeAudioUrl = useMemo(() => (isPlayableAudioUrl(audioUrl) ? audioUrl!.trim() : null), [audioUrl]);
 
   const handleToggle = async () => {
     if (!audioRef.current) return;
@@ -24,7 +32,7 @@ export function AudioPlayer({ audioUrl }: { audioUrl?: string | null }) {
     }
   };
 
-  if (!audioUrl) {
+  if (!safeAudioUrl) {
     return (
       <Card variant="base" className="space-y-1.5 p-4">
         <p className="text-xs font-semibold tracking-wide text-[#8B8177]">친구 목소리</p>
@@ -59,7 +67,7 @@ export function AudioPlayer({ audioUrl }: { audioUrl?: string | null }) {
         onPause={() => setIsPlaying(false)}
         onPlay={() => setIsPlaying(true)}
       >
-        <source src={audioUrl} />
+        <source src={safeAudioUrl} />
       </audio>
     </Card>
   );
