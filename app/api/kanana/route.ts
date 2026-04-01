@@ -140,19 +140,21 @@ const BANNED_IDENTITY_PATTERNS = [
   /ai\s*비서/i,
 ];
 
+function buildSafeAssistantText(character: CharacterCard, turnMode: KananaTurnMode): string {
+  if (turnMode === 'continue_turn') {
+    return `${character.name}인 내가 방금 네 말을 듣고 더 가까이 왔어. ${character.question}`;
+  }
+  return `${character.greeting} ${character.question}`;
+}
+
 function sanitizeAssistantText(text: string, character: CharacterCard, turnMode: KananaTurnMode): string {
   const normalized = text.replace(/\s+/g, ' ').trim();
   if (!normalized) {
-    return turnMode === 'continue_turn'
-      ? `${character.name}답게 이어서 말해볼게. 우리 다음엔 무엇을 해볼까?`
-      : `${character.greeting} ${character.question}`;
+    return buildSafeAssistantText(character, turnMode);
   }
 
   if (BANNED_IDENTITY_PATTERNS.some((pattern) => pattern.test(normalized))) {
-    if (turnMode === 'continue_turn') {
-      return `${character.name}인 내가 방금 네 말을 듣고 더 가까이 왔어. ${character.question}`;
-    }
-    return `${character.greeting} ${character.question}`;
+    return buildSafeAssistantText(character, turnMode);
   }
 
   return normalized;
@@ -302,8 +304,14 @@ export async function POST(req: Request) {
 
     let responseAudioBase64 = parsed.audioBase64;
     let responseAudioMimeType = parsed.audioMimeType;
+    const assistantTextWasSanitized = resolvedAssistantText !== parsed.assistantText;
 
-    if (parsed.audioBase64) {
+    if (assistantTextWasSanitized) {
+      responseAudioBase64 = null;
+      responseAudioMimeType = null;
+    }
+
+    if (parsed.audioBase64 && !assistantTextWasSanitized) {
       try {
         const pcmBuffer = Buffer.from(parsed.audioBase64, 'base64');
         const wavBuffer = wrapPcm16ToWav({

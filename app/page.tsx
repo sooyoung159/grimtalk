@@ -114,12 +114,6 @@ export default function HomePage() {
         assistantAudioUrl: null,
       });
 
-      addTurn({
-        userText: normalizedUserText,
-        assistantText: '...',
-        assistantAudioUrl: null,
-      });
-
       const result = await kanana.submitContinueTurn({
         audio: audioFile,
         character: fixedCharacterProfile,

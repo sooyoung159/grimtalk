@@ -3,7 +3,7 @@ import { CharacterCard as T } from '@/types/character';
 import { CharacterTraits } from './character-traits';
 
 export function CharacterCard({ character, assistantText }: { character: T; assistantText?: string }) {
-  const firstGreeting = character.greeting?.trim() || assistantText?.trim() || '안녕! 만나서 반가워!';
+  const firstGreeting = character.greeting?.trim() || '안녕! 만나서 반가워!';
   const followUpQuestion = character.question?.trim();
   const identity = character.identity?.trim();
   const hasTraits = character.traits?.some(Boolean);
