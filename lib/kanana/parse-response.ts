@@ -90,6 +90,30 @@ function extractTextFromContent(content: unknown): string | null {
   return chunks.length ? chunks.join('\n') : null;
 }
 
+function extractTextSeed(raw: unknown): string | null {
+  if (!isRecord(raw)) return null;
+
+  const choices = Array.isArray(raw.choices) ? raw.choices : [];
+  for (const choice of choices) {
+    if (!isRecord(choice)) continue;
+    const msg = isRecord(choice.message) ? choice.message : null;
+    const fromMessage = msg ? extractTextFromContent(msg.content) : null;
+    if (fromMessage) return fromMessage;
+
+    const fromChoiceText = pickFirstString(choice.text);
+    if (fromChoiceText) return fromChoiceText;
+  }
+
+  const output = Array.isArray(raw.output) ? raw.output : [];
+  for (const out of output) {
+    if (!isRecord(out)) continue;
+    const text = extractTextFromContent(out.content);
+    if (text) return text;
+  }
+
+  return null;
+}
+
 function normalizeTraits(v: unknown): [string, string] {
   if (Array.isArray(v)) {
     const t = v.map((x) => (typeof x === 'string' ? x.trim() : '')).filter(Boolean);
@@ -128,17 +152,13 @@ function extractNameFromAssistantText(text: string): string | null {
 
 function extractCharacter(raw: unknown, assistantTextHint?: string | null): CharacterCard {
   const extractedName = assistantTextHint ? extractNameFromAssistantText(assistantTextHint) : null;
-
-  if (!isRecord(raw)) {
-    const fallback = pickFallbackCharacter(assistantTextHint);
-    return extractedName ? { ...fallback, name: extractedName, greeting: `안녕! 나는 ${extractedName}야!` } : fallback;
-  }
-
-  const source = isRecord(raw.character)
-    ? raw.character
-    : isRecord(raw.data) && isRecord(raw.data.character)
-      ? raw.data.character
-      : null;
+  const source =
+    isRecord(raw) &&
+    (isRecord(raw.character)
+      ? raw.character
+      : isRecord(raw.data) && isRecord(raw.data.character)
+        ? raw.data.character
+        : null);
 
   const fallback = pickFallbackCharacter(assistantTextHint);
 
@@ -161,28 +181,8 @@ function extractCharacter(raw: unknown, assistantTextHint?: string | null): Char
 }
 
 function extractAssistantText(raw: unknown, fallbackCharacter: CharacterCard): string {
-  if (!isRecord(raw)) {
-    return `${fallbackCharacter.greeting} ${fallbackCharacter.question}`;
-  }
-
-  const choices = Array.isArray(raw.choices) ? raw.choices : [];
-  for (const choice of choices) {
-    if (!isRecord(choice)) continue;
-    const msg = isRecord(choice.message) ? choice.message : null;
-    const fromMessage = msg ? extractTextFromContent(msg.content) : null;
-    if (fromMessage) return fromMessage;
-
-    const fromChoiceText = pickFirstString(choice.text);
-    if (fromChoiceText) return fromChoiceText;
-  }
-
-  const output = Array.isArray(raw.output) ? raw.output : [];
-  for (const out of output) {
-    if (!isRecord(out)) continue;
-    const text = extractTextFromContent(out.content);
-    if (text) return text;
-  }
-
+  const seeded = extractTextSeed(raw);
+  if (seeded) return seeded;
   return `${fallbackCharacter.greeting} ${fallbackCharacter.question}`;
 }
 
@@ -224,14 +224,7 @@ function findAudioCandidate(raw: unknown): { base64: string | null; mimeType: st
 }
 
 export function parseKananaResponse(raw: unknown): ParsedResult {
-  let assistantTextSeed: string | null = null;
-  if (isRecord(raw) && Array.isArray(raw.choices) && raw.choices.length > 0) {
-    const firstChoice = raw.choices[0];
-    if (isRecord(firstChoice) && isRecord(firstChoice.message)) {
-      assistantTextSeed = extractTextFromContent(firstChoice.message.content);
-    }
-  }
-
+  const assistantTextSeed = extractTextSeed(raw);
   const character = extractCharacter(raw, assistantTextSeed);
   const assistantText = extractAssistantText(raw, character);
   const { base64, mimeType } = findAudioCandidate(raw);
