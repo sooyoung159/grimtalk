@@ -14,8 +14,14 @@ function getKananaRuntimeMode(): KananaRuntimeMode {
 
 function toDataAudioUrl(audioBase64?: string | null, audioMimeType?: string | null): string | null {
   if (!audioBase64) return null;
-  const mimeType = audioMimeType || 'audio/wav';
-  return `data:${mimeType};base64,${audioBase64}`;
+
+  const normalizedBase64 = audioBase64.trim();
+  if (!normalizedBase64 || /[^A-Za-z0-9+/=]/.test(normalizedBase64)) return null;
+
+  const rawMimeType = (audioMimeType || 'audio/wav').trim().toLowerCase();
+  const safeMimeType = rawMimeType.startsWith('audio/') ? rawMimeType : 'audio/wav';
+
+  return `data:${safeMimeType};base64,${normalizedBase64}`;
 }
 
 export function useKananaRequest() {
