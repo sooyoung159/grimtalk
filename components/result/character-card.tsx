@@ -8,11 +8,12 @@ export function CharacterCard({ character, assistantText, messages, turnMode = '
   const followUpQuestion = character.question?.trim();
   const identity = character.identity?.trim();
   const hasTraits = character.traits?.some(Boolean);
-  const latestUserMessage = [...(messages ?? [])].reverse().find((m) => m.role === 'user' && m.text.trim() !== '...');
-  const latestAssistantMessage = [...(messages ?? [])].reverse().find((m) => m.role === 'assistant' && m.text.trim() !== '...');
+  const reversedMessages = [...(messages ?? [])].reverse();
+  const latestUserMessage = reversedMessages.find((m) => m.role === 'user' && m.text.trim() !== '...');
+  const latestAssistantMessage = reversedMessages.find((m) => m.role === 'assistant' && m.text.trim() !== '...');
   const currentReply = latestAssistantMessage?.text?.trim() || assistantText?.trim() || firstGreeting;
   const currentUserText = latestUserMessage?.text?.trim();
-  const showDetails = Boolean(identity || hasTraits);
+  const showDetails = Boolean(identity || hasTraits || (assistantText?.trim() && assistantText.trim() !== firstGreeting));
 
   if (turnMode === 'continue_turn') {
     return (
@@ -38,7 +39,7 @@ export function CharacterCard({ character, assistantText, messages, turnMode = '
           </div>
         </Card>
 
-        {showDetails && (
+        {Boolean(identity || hasTraits) && (
           <details className="rounded-[22px] border border-[#EFE7DC] bg-white/80 px-4 py-3 text-sm text-[#675F59]">
             <summary className="cursor-pointer list-none text-xs font-semibold tracking-wide text-[#8B8177]">
               이 친구 더 알아보기
