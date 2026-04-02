@@ -12,11 +12,13 @@ function getKananaRuntimeMode(): KananaRuntimeMode {
   return raw === 'mock' ? 'mock' : 'live';
 }
 
+const INVALID_BASE64_CHARS = /[^A-Za-z0-9+/=]/;
+
 function toDataAudioUrl(audioBase64?: string | null, audioMimeType?: string | null): string | null {
   if (!audioBase64) return null;
 
-  const normalizedBase64 = audioBase64.trim();
-  if (!normalizedBase64 || /[^A-Za-z0-9+/=]/.test(normalizedBase64)) return null;
+  const normalizedBase64 = audioBase64.replace(/\s/g, '');
+  if (!normalizedBase64 || INVALID_BASE64_CHARS.test(normalizedBase64)) return null;
 
   const rawMimeType = (audioMimeType || 'audio/wav').trim().toLowerCase();
   const safeMimeType = rawMimeType.startsWith('audio/') ? rawMimeType : 'audio/wav';
