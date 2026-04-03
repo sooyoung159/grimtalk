@@ -56,13 +56,12 @@ export default function HomePage() {
     if (!audioFile) return null;
 
     const key = makeTranscriptKey(audioFile);
-    if (recentTranscriptKey === key && recentTranscript) {
-      return recentTranscript;
+    if (recentTranscriptKey === key && recentTranscript !== null) {
+      return recentTranscript || null;
     }
 
-    const fallback = '방금 네가 친구에게 말을 걸었어.';
-    setRecentTranscriptCache({ key, transcript: fallback });
-    return fallback;
+    setRecentTranscriptCache({ key, transcript: '' });
+    return null;
   };
 
   const submitFirstTurn = async (payload: { image?: File; audioFile?: File }) => {
@@ -75,7 +74,7 @@ export default function HomePage() {
       const result = await kanana.submitFirstTurn({ image: payload.image, audio: payload.audioFile, mode, text: baseText });
       setResult({ character: result.character, assistantText: result.assistantText, assistantAudioUrl: result.audioUrl });
       addTurn({
-        userText: extractedUserUtterance ?? (mode === 'image_only' ? '이미지 설명 요청' : baseText),
+        userText: extractedUserUtterance ?? (mode === 'image_only' ? '이미지 설명 요청' : '그림 친구에게 첫 말을 걸었어.'),
         assistantText: result.assistantText,
         assistantAudioUrl: result.audioUrl,
       });
@@ -95,7 +94,7 @@ export default function HomePage() {
     setSubmitting(true);
     try {
       const extractedUserUtterance = await extractUserUtterance(audioFile);
-      const normalizedUserText = extractedUserUtterance ?? '(방금 한 말 인식 실패)';
+      const normalizedUserText = extractedUserUtterance ?? '방금 친구에게 다시 말을 걸었어.';
 
       addTurn({
         userText: normalizedUserText,
@@ -106,7 +105,7 @@ export default function HomePage() {
       const result = await kanana.submitContinueTurn({
         audio: audioFile,
         character: fixedCharacterProfile,
-        previousUserText: recentUserText,
+        previousUserText: null,
         previousAssistantText: recentAssistantText,
       });
 
