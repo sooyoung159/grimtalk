@@ -133,10 +133,11 @@ function pickFallbackCharacter(seed?: string | null): CharacterCard {
 
 function extractNameFromAssistantText(text: string): string | null {
   const normalized = text.replace(/\s+/g, ' ').trim();
+  // 공백 포함 이름도 매칭 (예: "빨간 레고 게", "파란 고래")
   const patterns = [
-    /내 이름은\s*([가-힣A-Za-z0-9]{2,12})/,
-    /나는\s*([가-힣A-Za-z0-9]{2,12})야/,
-    /나는\s*([가-힣A-Za-z0-9]{2,12})라고\s*해/,
+    /내 이름은\s*([가-힣A-Za-z0-9\s]{2,20}?)(?:야|이야|라고|입니다|이에요|[.!,])/,
+    /나는\s*([가-힣A-Za-z0-9\s]{2,20}?)(?:야|이야|라고|입니다|이에요|[.!,])/,
+    /나는\s*([가-힣A-Za-z0-9\s]{2,20}?)라고\s*해/,
   ];
 
   for (const pattern of patterns) {
@@ -150,8 +151,28 @@ function extractNameFromAssistantText(text: string): string | null {
   return null;
 }
 
+/**
+ * AI 응답 텍스트의 첫 문장에서 자기소개를 추출하여 identity로 사용.
+ * 예: "나는 빨간 레고 게야, 바다 대신 타일 위에서 움직여 보는 중이야."
+ *    → "바다 대신 타일 위에서 움직여 보는 중"
+ */
+function extractIdentityFromText(text: string): string | null {
+  const normalized = text.replace(/\s+/g, ' ').trim();
+  // 쉼표/마침표로 구분된 두 번째 절을 identity로 사용
+  const parts = normalized.split(/[,.!]/)
+    .map((s) => s.trim())
+    .filter((s) => s.length > 4);
+  // 첫 번째 절은 이름 소개이므로 두 번째 절 사용
+  if (parts.length >= 2) {
+    const identity = parts[1].replace(/^\s*(그리고|그래서|그런데)\s*/, '').trim();
+    if (identity.length > 4) return identity;
+  }
+  return null;
+}
+
 function extractCharacter(raw: unknown, assistantTextHint?: string | null): CharacterCard {
   const extractedName = assistantTextHint ? extractNameFromAssistantText(assistantTextHint) : null;
+  const extractedIdentity = assistantTextHint ? extractIdentityFromText(assistantTextHint) : null;
   const source =
     isRecord(raw) &&
     (isRecord(raw.character)
@@ -163,7 +184,18 @@ function extractCharacter(raw: unknown, assistantTextHint?: string | null): Char
   const fallback = pickFallbackCharacter(assistantTextHint);
 
   if (!source) {
-    return extractedName ? { ...fallback, name: extractedName, greeting: `안녕! 나는 ${extractedName}야!` } : fallback;
+    // API가 구조화된 캐릭터를 안 줄 때, AI 응답 텍스트에서 직접 구성
+    if (extractedName) {
+      return {
+        name: extractedName,
+        identity: extractedIdentity ?? `그림 속에서 막 깨어난 ${extractedName}`,
+        traits: fallback.traits,
+        voiceTone: fallback.voiceTone,
+        greeting: `안녕! 나는 ${extractedName}야!`,
+        question: fallback.question,
+      };
+    }
+    return fallback;
   }
 
   const resolvedName = pickFirstString(source.name, extractedName) ?? fallback.name;

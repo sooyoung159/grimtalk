@@ -147,10 +147,11 @@ const BANNED_IDENTITY_PATTERNS = [
 
 function alignCharacterToAssistantText(character: CharacterCard, assistantText: string): CharacterCard {
   const normalized = assistantText.replace(/\s+/g, ' ').trim();
+  // 공백 포함 이름 매칭 (예: "빨간 레고 게", "파란 고래")
   const patterns = [
-    /내 이름은\s*([가-힣A-Za-z0-9]{2,12})/,
-    /나는\s*([가-힣A-Za-z0-9]{2,12})야/,
-    /나는\s*([가-힣A-Za-z0-9]{2,12})라고\s*해/,
+    /내 이름은\s*([가-힣A-Za-z0-9\s]{2,20}?)(?:야|이야|라고|입니다|이에요|[.!,])/,
+    /나는\s*([가-힣A-Za-z0-9\s]{2,20}?)(?:야|이야|라고|입니다|이에요|[.!,])/,
+    /나는\s*([가-힣A-Za-z0-9\s]{2,20}?)라고\s*해/,
   ];
 
   for (const pattern of patterns) {
@@ -158,9 +159,16 @@ function alignCharacterToAssistantText(character: CharacterCard, assistantText: 
     if (match?.[1]) {
       const extractedName = match[1].trim();
       if (extractedName && extractedName !== '카나나' && extractedName !== character.name) {
+        // 응답 텍스트에서 identity도 추출
+        const parts = normalized.split(/[,.!]/).map((s) => s.trim()).filter((s) => s.length > 4);
+        const identity = parts.length >= 2
+          ? parts[1].replace(/^\s*(그리고|그래서|그런데)\s*/, '').trim()
+          : null;
+
         return {
           ...character,
           name: extractedName,
+          identity: (identity && identity.length > 4) ? identity : `그림 속에서 막 깨어난 ${extractedName}`,
           greeting: `안녕! 나는 ${extractedName}야!`,
         };
       }
