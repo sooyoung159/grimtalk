@@ -262,7 +262,7 @@ export async function POST(req: Request) {
       imageBase64,
       imageMimeType,
       audioBase64: requestAudioBase64,
-      audioMimeType: isFile(audio) ? (audio.type.includes('wav') ? 'audio/wav' : audio.type) : 'audio/wav',
+      audioMimeType: 'audio/wav',
       text,
     });
 
