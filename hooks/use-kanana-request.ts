@@ -52,24 +52,38 @@ export function useKananaRequest() {
       };
     }
 
-    const formData = new FormData();
+    let debugStep = 'formdata_create';
+    try {
+      const formData = new FormData();
 
-    if (payload.image) formData.append('image', payload.image);
-    if (payload.audio) formData.append('audio', payload.audio);
-    if (payload.text) formData.append('text', payload.text);
-    if (payload.mode) formData.append('mode', payload.mode);
-    if (payload.turnMode) formData.append('turnMode', payload.turnMode);
-    if (payload.character) formData.append('character', JSON.stringify(payload.character));
-    if (payload.previousUserText) formData.append('previousUserText', payload.previousUserText);
-    if (payload.previousAssistantText) formData.append('previousAssistantText', payload.previousAssistantText);
+      debugStep = 'formdata_append';
+      if (payload.image) formData.append('image', payload.image);
+      if (payload.audio) formData.append('audio', payload.audio);
+      if (payload.text) formData.append('text', payload.text);
+      if (payload.mode) formData.append('mode', payload.mode);
+      if (payload.turnMode) formData.append('turnMode', payload.turnMode);
+      if (payload.character) formData.append('character', JSON.stringify(payload.character));
+      if (payload.previousUserText) formData.append('previousUserText', payload.previousUserText);
+      if (payload.previousAssistantText) formData.append('previousAssistantText', payload.previousAssistantText);
 
-    const res = await fetch('/api/kanana', { method: 'POST', body: formData });
-    const data: KananaRouteResponse = await res.json();
-    if (!res.ok || !data.ok || !data.character || !data.assistantText) throw new Error(data.error ?? '응답을 가져오지 못했어.');
+      debugStep = 'fetch';
+      const res = await fetch('/api/kanana', { method: 'POST', body: formData });
 
-    const audioUrl = toDataAudioUrl(data.audioBase64, data.audioMimeType);
+      debugStep = 'json_parse';
+      const data: KananaRouteResponse = await res.json();
 
-    return { character: data.character, assistantText: data.assistantText, audioUrl };
+      debugStep = 'validate';
+      if (!res.ok || !data.ok || !data.character || !data.assistantText) throw new Error(data.error ?? '응답을 가져오지 못했어.');
+
+      debugStep = 'audio_url';
+      const audioUrl = toDataAudioUrl(data.audioBase64, data.audioMimeType);
+
+      return { character: data.character, assistantText: data.assistantText, audioUrl };
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error(`[kanana] 에러 (${debugStep}):`, msg);
+      throw new Error(`[${debugStep}] ${msg}`);
+    }
   };
 
   const submitFirstTurn = (payload: {
