@@ -51,9 +51,43 @@ function encodePcm16ToWav(params: {
   return new Blob([buffer], { type: 'audio/wav' });
 }
 
+/**
+ * Safari/iOS에서는 decodeAudioData의 Promise 버전이
+ * "The string did not match the expected pattern." 에러를 던지는 경우가 있다.
+ * 콜백 기반 호출로 우회하고, 그마저도 실패하면 에러를 throw한다.
+ */
+function safariSafeDecodeAudioData(
+  ctx: AudioContext,
+  buffer: ArrayBuffer,
+): Promise<AudioBuffer> {
+  // Safari는 같은 ArrayBuffer를 재사용하면 에러가 나므로 복사본 사용
+  const copy = buffer.slice(0);
+
+  return new Promise<AudioBuffer>((resolve, reject) => {
+    // 먼저 콜백 기반으로 시도 (Safari 호환성이 가장 높음)
+    try {
+      ctx.decodeAudioData(
+        copy,
+        (decoded) => resolve(decoded),
+        (err) => reject(err ?? new Error('decodeAudioData callback error')),
+      );
+    } catch {
+      // 콜백 기반도 동기적으로 throw 하는 경우 Promise 버전 시도
+      ctx.decodeAudioData(copy).then(resolve, reject);
+    }
+  });
+}
+
 export async function convertRecordedBlobToWav16kMono(blob: Blob): Promise<Blob> {
+  // blob이 비어있거나 너무 작으면 변환 불가
+  if (!blob || blob.size < 100) {
+    throw new Error('녹음된 데이터가 너무 짧아. 조금만 더 말해줄래?');
+  }
+
   const arrayBuffer = await blob.arrayBuffer();
-  const AudioContextCtor = window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+  const AudioContextCtor =
+    window.AudioContext ||
+    (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
 
   if (!AudioContextCtor) {
     throw new Error('Web Audio API가 지원되지 않는 환경이야.');
@@ -62,7 +96,8 @@ export async function convertRecordedBlobToWav16kMono(blob: Blob): Promise<Blob>
   const decodeContext = new AudioContextCtor();
 
   try {
-    const decoded = await decodeContext.decodeAudioData(arrayBuffer);
+    // Safari 안전한 decodeAudioData 호출
+    const decoded = await safariSafeDecodeAudioData(decodeContext, arrayBuffer);
 
     const targetSampleRate = 16000;
     const targetChannels = 1;

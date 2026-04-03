@@ -110,11 +110,14 @@ export function buildKananaPayload(params: BuildKananaPayloadParams) {
   }
 
   if ((mode === 'audio_only' || mode === 'image_audio') && audioBase64) {
+    // MIME type에서 format을 추출 (audio/wav → wav, audio/mp4 → mp4)
+    const audioMimeType = _audioMimeType || 'audio/wav';
+    const audioFormat = audioMimeType.replace(/^audio\//, '').replace(/;.*$/, '') || 'wav';
     content.push({
       type: 'input_audio',
       input_audio: {
         data: audioBase64,
-        format: 'wav',
+        format: audioFormat,
       },
     });
   }

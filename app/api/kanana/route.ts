@@ -6,7 +6,12 @@ import { CharacterCard } from '@/types/character';
 
 const REQUEST_TIMEOUT_MS = 20000;
 const ALLOWED_IMAGE_MIME = new Set(['image/jpeg', 'image/png', 'image/webp']);
-const ALLOWED_AUDIO_MIME = new Set(['audio/wav', 'audio/x-wav', 'audio/wave']);
+const ALLOWED_AUDIO_MIME = new Set([
+  'audio/wav', 'audio/x-wav', 'audio/wave',
+  // Safari/iOS fallback: WAV 변환 실패 시 원본 포맷이 올 수 있음
+  'audio/mp4', 'audio/aac', 'audio/mpeg',
+  'audio/webm', 'audio/ogg',
+]);
 
 type ErrorBody = { ok: false; error: string };
 
@@ -257,7 +262,7 @@ export async function POST(req: Request) {
       imageBase64,
       imageMimeType,
       audioBase64: requestAudioBase64,
-      audioMimeType: 'audio/wav',
+      audioMimeType: isFile(audio) ? (audio.type.includes('wav') ? 'audio/wav' : audio.type) : 'audio/wav',
       text,
     });
 

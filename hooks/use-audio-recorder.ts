@@ -3,17 +3,25 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { convertRecordedBlobToWav16kMono } from '@/lib/media/audio-browser';
 
+/**
+ * Safari/iOS 친화적으로 MIME type 후보를 선택한다.
+ * Safari에서는 audio/mp4가 가장 안정적이므로 최우선 후보로 배치.
+ */
 function getPreferredMimeType(): string {
+  if (typeof MediaRecorder === 'undefined') return '';
+
+  // Safari/iOS에서 audio/mp4를 최우선으로 사용
+  // audio/mp4는 decodeAudioData 호환성이 가장 높다
   const candidates = [
-    'audio/webm;codecs=opus',
-    'audio/webm',
     'audio/mp4',
     'audio/mp4;codecs=mp4a.40.2',
     'audio/aac',
+    'audio/webm;codecs=opus',
+    'audio/webm',
     'audio/ogg',
   ];
 
-  const supported = candidates.find((v) => typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported(v));
+  const supported = candidates.find((v) => MediaRecorder.isTypeSupported(v));
   return supported ?? '';
 }
 
@@ -104,20 +112,30 @@ export function useAudioRecorder() {
         recorder.stop();
       });
 
-      const wavBlob = await convertRecordedBlobToWav16kMono(recordedBlob);
-
       streamRef.current?.getTracks().forEach((t) => t.stop());
       const ms = Date.now() - startedAtRef.current;
       setDurationMs(ms);
       setIsRecording(false);
 
-      const file = new File([wavBlob], `record-${Date.now()}.wav`, { type: 'audio/wav' });
+      // WAV 변환 시도 — 실패해도 원본 blob으로 fallback
+      let wavBlob: Blob;
+      try {
+        wavBlob = await convertRecordedBlobToWav16kMono(recordedBlob);
+      } catch (convertError) {
+        console.warn('[audio-recorder] WAV 변환 실패, 원본 blob 사용:', convertError);
+        // 원본 blob을 audio/wav MIME으로 감싸서 전달
+        // 서버에서 MIME 검증에 실패할 수 있으므로, 원본 MIME 유지
+        wavBlob = recordedBlob;
+      }
+
+      const mimeType = wavBlob.type.startsWith('audio/wav') ? 'audio/wav' : wavBlob.type || 'audio/wav';
+      const file = new File([wavBlob], `record-${Date.now()}.wav`, { type: mimeType });
 
       return {
         file,
         previewUrl: URL.createObjectURL(file),
         durationMs: ms,
-        mimeType: 'audio/wav',
+        mimeType,
       };
     } catch {
       setError('녹음을 WAV 형식으로 변환하지 못했어. 한 번 더 해볼까?');
