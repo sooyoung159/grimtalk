@@ -69,8 +69,32 @@ export function useKananaRequest() {
       debugStep = 'fetch';
       const res = await fetch('/api/kanana', { method: 'POST', body: formData });
 
+      // Safari에서 res.json()과 res.text()가
+      // "The string did not match the expected pattern" 에러를 던질 수 있다.
+      // arrayBuffer() → TextDecoder로 안전하게 읽는다.
+      debugStep = 'read_body';
+      let rawText: string;
+      try {
+        rawText = await res.text();
+      } catch {
+        // res.text()도 실패하면 arrayBuffer 경로로 우회
+        try {
+          const buf = await res.arrayBuffer();
+          rawText = new TextDecoder().decode(buf);
+        } catch {
+          throw new Error(`서버 응답을 읽지 못했어. (${res.status})`);
+        }
+      }
+
       debugStep = 'json_parse';
-      const data: KananaRouteResponse = await res.json();
+      let data: KananaRouteResponse;
+      try {
+        data = JSON.parse(rawText);
+      } catch {
+        const preview = rawText.slice(0, 200);
+        console.error('[kanana] JSON 파싱 실패, 서버 응답:', preview);
+        throw new Error(res.ok ? '응답 형식이 올바르지 않아.' : `서버 에러 (${res.status})`);
+      }
 
       debugStep = 'validate';
       if (!res.ok || !data.ok || !data.character || !data.assistantText) throw new Error(data.error ?? '응답을 가져오지 못했어.');
@@ -82,7 +106,8 @@ export function useKananaRequest() {
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       console.error(`[kanana] 에러 (${debugStep}):`, msg);
-      throw new Error(`[${debugStep}] ${msg}`);
+      // 사용자에게 보여줄 에러는 debugStep 접두사 없이 깔끔하게
+      throw new Error(msg);
     }
   };
 
