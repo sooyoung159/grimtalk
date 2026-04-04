@@ -44,6 +44,45 @@ export function useMediaCapture() {
     return { file, previewUrl: URL.createObjectURL(file) };
   };
 
+  const compressImage = (fileOrBlob: Blob): Promise<Blob> => {
+    return new Promise((resolve, reject) => {
+      const url = URL.createObjectURL(fileOrBlob);
+      const img = new Image();
+      img.onload = () => {
+        URL.revokeObjectURL(url);
+        let { width, height } = img;
+        const MAX_SIZE = 1200;
+
+        if (width > MAX_SIZE || height > MAX_SIZE) {
+          const ratio = Math.min(MAX_SIZE / width, MAX_SIZE / height);
+          width = Math.round(width * ratio);
+          height = Math.round(height * ratio);
+        }
+
+        const cvs = document.createElement('canvas');
+        cvs.width = width;
+        cvs.height = height;
+        const ctx = cvs.getContext('2d');
+        if (!ctx) return resolve(fileOrBlob); // fallback
+
+        ctx.drawImage(img, 0, 0, width, height);
+        cvs.toBlob(
+          (blob) => {
+            if (blob) resolve(blob);
+            else resolve(fileOrBlob); // fallback
+          },
+          'image/jpeg',
+          0.85
+        );
+      };
+      img.onerror = () => {
+        URL.revokeObjectURL(url);
+        resolve(fileOrBlob);
+      };
+      img.src = url;
+    });
+  };
+
   const captureFrame = async () => {
     if (!videoRef.current) return null;
     const { videoWidth, videoHeight } = videoRef.current;
@@ -59,10 +98,15 @@ export function useMediaCapture() {
     if (!ctx) return null;
 
     ctx.drawImage(videoRef.current, 0, 0);
-    const blob = await new Promise<Blob | null>((res) => canvas.toBlob(res, 'image/jpeg', 0.92));
+    const blob = await new Promise<Blob | null>((res) => canvas.toBlob(res, 'image/jpeg', 0.95));
     if (!blob) return null;
 
-    return buildImageState(blob, `capture-${Date.now()}.jpg`, 'image/jpeg');
+    try {
+      const compressed = await compressImage(blob);
+      return buildImageState(compressed, `capture-${Date.now()}.jpg`, 'image/jpeg');
+    } catch {
+      return buildImageState(blob, `capture-${Date.now()}.jpg`, 'image/jpeg');
+    }
   };
 
   const openFilePicker = () => {
@@ -81,7 +125,12 @@ export function useMediaCapture() {
 
     stopCamera();
     setError(null);
-    return buildImageState(file, file.name || `upload-${Date.now()}.jpg`, file.type || 'image/jpeg');
+    try {
+      const compressed = await compressImage(file);
+      return buildImageState(compressed, file.name || `upload-${Date.now()}.jpg`, 'image/jpeg');
+    } catch {
+      return buildImageState(file, file.name || `upload-${Date.now()}.jpg`, file.type || 'image/jpeg');
+    }
   };
 
   useEffect(() => {
