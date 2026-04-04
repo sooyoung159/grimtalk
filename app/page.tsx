@@ -60,38 +60,8 @@ export default function HomePage() {
       if (recentTranscript.trim()) return recentTranscript;
     }
 
-    // iOS 등 환경에서 Web Speech API가 동작하지 않았을 수 있습니다.
-    // 사용자가 말한 내용을 텍스트로 꼭 추출하기 위해 Kanana 모델의 audio_only 기능을 빌려옵니다.
-    try {
-      const baseText = getDefaultTextByMode('audio_only', 'first_turn');
-      const sttRes = await fetch('/api/kanana', {
-        method: 'POST',
-        body: (() => {
-          const fd = new FormData();
-          fd.append('audio', audioFile);
-          fd.append('mode', 'audio_only');
-          fd.append('turnMode', 'first_turn');
-          fd.append('text', baseText);
-          return fd;
-        })()
-      });
-      if (sttRes.ok) {
-        const data = await sttRes.json();
-        if (data.assistantText && data.assistantText.trim()) {
-          const text = data.assistantText.trim();
-          // AI 모델이 STT 지시를 어기고 자기소개를 하거나 안내 멘트를 한 경우 버립니다.
-          if (/카나나|카카오|어시스턴트|인공지능|무엇을 도와드릴까요|도움이 필요하시면|말씀해 주세요/.test(text)) {
-            console.warn('STT hallucination discarded:', text);
-          } else {
-            setRecentTranscriptCache({ key, transcript: text });
-            return text;
-          }
-        }
-      }
-    } catch {
-      console.warn('Fallback STT failed');
-    }
-
+    // 모바일 등에서 Web Speech API가 동작하지 않을 경우 
+    // Kanana API 우회 호출을 하지 않고(API 사용량/속도 최적화) 고정 문구로 넘깁니다.
     setRecentTranscriptCache({ key, transcript: '' });
     return null;
   };
