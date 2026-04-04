@@ -156,6 +156,11 @@ export default function HomePage() {
 
     setRecordedAudio(recorded);
 
+    if (recorded.transcript) {
+      const key = makeTranscriptKey(recorded.file);
+      setRecentTranscriptCache({ key, transcript: recorded.transcript });
+    }
+
     if (fixedCharacterProfile) {
       await submitContinueTurn(recorded.file);
       return;

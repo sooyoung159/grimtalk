@@ -98,6 +98,8 @@ export function useAudioRecorder() {
   const gainRef = useRef<GainNode | null>(null);
   const pcmChunksRef = useRef<Float32Array[]>([]);
   const startedAtRef = useRef(0);
+  const recognitionRef = useRef<any>(null);
+  const transcriptRef = useRef<string>('');
 
   const cleanup = useCallback(() => {
     try { processorRef.current?.disconnect(); } catch { /* noop */ }
@@ -115,6 +117,11 @@ export function useAudioRecorder() {
     processorRef.current = null;
     gainRef.current = null;
     pcmChunksRef.current = [];
+    if (recognitionRef.current) {
+      try { recognitionRef.current.stop(); } catch { /* noop */ }
+      recognitionRef.current = null;
+    }
+    transcriptRef.current = '';
     setIsRecording(false);
   }, []);
 
@@ -187,6 +194,29 @@ export function useAudioRecorder() {
       processor.connect(gain);
       gain.connect(ctx.destination);
 
+      // Web Speech API 시작
+      transcriptRef.current = '';
+      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+      if (SpeechRecognition) {
+        try {
+          const recognition = new SpeechRecognition();
+          recognition.lang = 'ko-KR';
+          recognition.interimResults = true;
+          recognition.continuous = true;
+          recognition.onresult = (e: any) => {
+            let text = '';
+            for (let i = 0; i < e.results.length; i++) {
+              text += e.results[i][0].transcript;
+            }
+            transcriptRef.current = text.trim();
+          };
+          recognition.start();
+          recognitionRef.current = recognition;
+        } catch (err) {
+          console.warn('SpeechRecognition start failed', err);
+        }
+      }
+
       startedAtRef.current = Date.now();
       setError(null);
       setIsRecording(true);
@@ -250,11 +280,14 @@ export function useAudioRecorder() {
 
       const file = new File([wavBlob], `record-${Date.now()}.wav`, { type: 'audio/wav' });
 
+      const finalTranscript = transcriptRef.current;
+      
       return {
         file,
         previewUrl: URL.createObjectURL(file),
         durationMs: ms,
         mimeType: 'audio/wav' as const,
+        transcript: finalTranscript,
       };
     } catch {
       setError('녹음을 WAV 형식으로 변환하지 못했어. 한 번 더 해볼까?');
