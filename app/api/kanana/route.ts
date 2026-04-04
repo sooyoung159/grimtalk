@@ -137,12 +137,16 @@ function parseCharacter(v: FormDataEntryValue | null): CharacterCard | null {
 }
 
 const BANNED_IDENTITY_PATTERNS = [
-  /나는\s*카카오에서\s*온\s*ai/i,
+  /나는\s*카카오/i,
+  /카카오에서\s*(온|만든)/i,
   /나는\s*카나나/i,
+  /카나나(야|예요|입니다|라고)/i,
   /카카오의\s*도우미/i,
   /ai\s*카나나/i,
+  /어시스턴트/i,
   /인공지능/i,
   /ai\s*비서/i,
+  /무엇을\s*도와드릴까요/i,
 ];
 
 function alignCharacterToAssistantText(character: CharacterCard, assistantText: string): CharacterCard {

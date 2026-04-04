@@ -78,8 +78,14 @@ export default function HomePage() {
       if (sttRes.ok) {
         const data = await sttRes.json();
         if (data.assistantText && data.assistantText.trim()) {
-          setRecentTranscriptCache({ key, transcript: data.assistantText.trim() });
-          return data.assistantText.trim();
+          const text = data.assistantText.trim();
+          // AI 모델이 STT 지시를 어기고 자기소개를 하거나 안내 멘트를 한 경우 버립니다.
+          if (/카나나|카카오|어시스턴트|인공지능|무엇을 도와드릴까요|도움이 필요하시면|말씀해 주세요/.test(text)) {
+            console.warn('STT hallucination discarded:', text);
+          } else {
+            setRecentTranscriptCache({ key, transcript: text });
+            return text;
+          }
         }
       }
     } catch {
@@ -131,7 +137,7 @@ export default function HomePage() {
       const result = await kanana.submitContinueTurn({
         audio: audioFile,
         character: fixedCharacterProfile,
-        previousUserText: null,
+        previousUserText: normalizedUserText,
         previousAssistantText: recentAssistantText,
       });
 
