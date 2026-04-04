@@ -57,7 +57,33 @@ export default function HomePage() {
 
     const key = makeTranscriptKey(audioFile);
     if (recentTranscriptKey === key && recentTranscript !== null) {
-      return recentTranscript || null;
+      if (recentTranscript.trim()) return recentTranscript;
+    }
+
+    // iOS 등 환경에서 Web Speech API가 동작하지 않았을 수 있습니다.
+    // 사용자가 말한 내용을 텍스트로 꼭 추출하기 위해 Kanana 모델의 audio_only 기능을 빌려옵니다.
+    try {
+      const baseText = getDefaultTextByMode('audio_only', 'first_turn');
+      const sttRes = await fetch('/api/kanana', {
+        method: 'POST',
+        body: (() => {
+          const fd = new FormData();
+          fd.append('audio', audioFile);
+          fd.append('mode', 'audio_only');
+          fd.append('turnMode', 'first_turn');
+          fd.append('text', baseText);
+          return fd;
+        })()
+      });
+      if (sttRes.ok) {
+        const data = await sttRes.json();
+        if (data.assistantText && data.assistantText.trim()) {
+          setRecentTranscriptCache({ key, transcript: data.assistantText.trim() });
+          return data.assistantText.trim();
+        }
+      }
+    } catch {
+      console.warn('Fallback STT failed');
     }
 
     setRecentTranscriptCache({ key, transcript: '' });

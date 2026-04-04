@@ -81,13 +81,14 @@ export function buildKananaPayload(params: BuildKananaPayloadParams) {
   const baseText = text?.trim() || getDefaultTextByMode(mode, turnMode);
   const content: Array<Record<string, unknown>> = [];
 
+  const profile = buildCharacterProfile(character);
+  const sections = [baseText];
+  if (profile) sections.push(profile);
+
   if (turnMode === 'continue_turn') {
-    const profile = buildCharacterProfile(character);
     const compactUser = trimContext(previousUserText, 80);
     const compactAssistant = trimContext(previousAssistantText, 120);
 
-    const sections = [baseText];
-    if (profile) sections.push(profile);
     if (compactAssistant) {
       const lines = ['최근 1턴 참고:'];
       if (compactUser) lines.push(`- 사용자: ${compactUser}`);
@@ -98,7 +99,13 @@ export function buildKananaPayload(params: BuildKananaPayloadParams) {
 
     content.push({ type: 'text', text: sections.join('\n\n') });
   } else {
-    content.push({ type: 'text', text: baseText });
+    // 첫 턴이고 캐릭터가 미리 설정되어 있다면 자신의 정체성을 알고 시작합니다.
+    if (character?.name) {
+      sections.push(`너는 이미 '${character.name}'이라는 이름과 설정을 가진 캐릭터야. 사용자에게 너의 이름을 말하고 인사해줘. 절대 다른 이름을 짓거나 사용자의 이름을 네 이름으로 착각하지 마.`);
+    } else {
+      sections.push('이름이 아직 없으므로 첫 인사에서 어울리는 이름을 지어서 알려줘.');
+    }
+    content.push({ type: 'text', text: sections.join('\n\n') });
   }
 
   if (turnMode === 'first_turn' && (mode === 'image_only' || mode === 'image_audio') && imageBase64 && imageMimeType) {

@@ -337,21 +337,19 @@ export async function POST(req: Request) {
     }
 
     const parsed = parseKananaResponse(raw);
+    const isBrandNew = !character || !character.name;
     const baseCharacter = turnMode === 'continue_turn' && character ? character : parsed.character;
     const resolvedAssistantText = sanitizeAssistantText(parsed.assistantText, baseCharacter, turnMode);
-    const resolvedCharacter = turnMode === 'first_turn' ? alignCharacterToAssistantText(baseCharacter, resolvedAssistantText) : baseCharacter;
+    
+    // 이미 이름이 정해져 있는 기존 캐릭터라면 모델이 응답에서 이상한 이름을 부르더라도 기존 캐릭터 설정을 유지합니다.
+    const resolvedCharacter = (turnMode === 'first_turn' && isBrandNew) 
+      ? alignCharacterToAssistantText(baseCharacter, resolvedAssistantText) 
+      : baseCharacter;
 
     let responseAudioBase64 = parsed.audioBase64;
     let responseAudioMimeType = parsed.audioMimeType;
-    const normalizedParsedAssistantText = parsed.assistantText.replace(/\s+/g, ' ').trim();
-    const assistantTextWasSanitized = resolvedAssistantText !== normalizedParsedAssistantText;
 
-    if (assistantTextWasSanitized) {
-      responseAudioBase64 = null;
-      responseAudioMimeType = null;
-    }
-
-    if (parsed.audioBase64 && !assistantTextWasSanitized) {
+    if (parsed.audioBase64) {
       try {
         const pcmBuffer = Buffer.from(parsed.audioBase64, 'base64');
         const wavBuffer = wrapPcm16ToWav({
