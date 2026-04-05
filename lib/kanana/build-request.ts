@@ -95,7 +95,7 @@ export function buildKananaPayload(params: BuildKananaPayloadParams) {
       lines.push(`- 친구: ${compactAssistant}`);
       sections.push(lines.join('\n'));
     }
-    sections.push('이번 턴 우선 규칙:\n- 같은 친구처럼 자연스럽게 이어서 말해줘.\n- 자기소개를 반복하지 마.\n- 이번 마지막 발화 반응을 가장 먼저 보여줘.');
+    sections.push('이번 턴 우선 규칙:\n- 같은 친구처럼 이어서 말해줘.\n- 절대 네 이름을 다시 언급하며 인사하지 마.\n- 사용자를 네 이름으로 부르거나 헷갈리지 마.\n- 방금 사용자가 한 말을 듣자마자 나온 즉각적인 반응을 첫 문장에 보여줘.');
 
     content.push({ type: 'text', text: sections.join('\n\n') });
   } else {

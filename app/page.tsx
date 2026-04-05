@@ -107,7 +107,7 @@ export default function HomePage() {
       const result = await kanana.submitContinueTurn({
         audio: audioFile,
         character: fixedCharacterProfile,
-        previousUserText: normalizedUserText,
+        previousUserText: recentUserText, // 이전 턴의 실제 사용자 발화를 넘김
         previousAssistantText: recentAssistantText,
       });
 
