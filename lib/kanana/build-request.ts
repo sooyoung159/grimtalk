@@ -103,7 +103,7 @@ export function buildKananaPayload(params: BuildKananaPayloadParams) {
     if (character?.name) {
       sections.push(`너는 이미 '${character.name}'이라는 이름과 설정을 가진 캐릭터야. 사용자에게 너의 이름을 말하고 인사해줘. 절대 다른 이름을 짓거나 사용자의 이름을 네 이름으로 착각하지 마.`);
     } else {
-      sections.push('이름이 아직 없으므로 첫 인사에서 어울리는 이름을 지어서 알려줘.');
+      sections.push('이름이 아직 없으므로 첫 인사에서 그림에 어울리는 짧은 이름을 하나 지어서 알려줘.\n규칙 1: 반드시 대답 어딘가에 "내 이름은 OO(이)야!" 또는 "나는 OO라고 해"와 같이 정확한 이름 정의 표현을 포함해.\n규칙 2: 이름 소개 바로 뒷 문장에, 네가 구체적으로 어떤 특징을 가진 친구인지(너의 정체성)를 한 문장으로 딱 설명해 줘. (예: "나는 오늘 숲길을 산책하러 나온 토끼 친구야.")');
     }
     content.push({ type: 'text', text: sections.join('\n\n') });
   }

@@ -151,11 +151,13 @@ const BANNED_IDENTITY_PATTERNS = [
 
 function alignCharacterToAssistantText(character: CharacterCard, assistantText: string): CharacterCard {
   const normalized = assistantText.replace(/\s+/g, ' ').trim();
-  // 공백 포함 이름 매칭 (예: "빨간 레고 게", "파란 고래")
+  // 공백 포함 이름 매칭 (예: "빨간 레고 게", "파란 고래", "이름은 '꿀돼지' 어때?")
   const patterns = [
-    /내 이름은\s*([가-힣A-Za-z0-9\s]{2,20}?)(?:야|이야|라고|입니다|이에요|[.!,])/,
-    /나는\s*([가-힣A-Za-z0-9\s]{2,20}?)(?:야|이야|라고|입니다|이에요|[.!,])/,
-    /나는\s*([가-힣A-Za-z0-9\s]{2,20}?)라고\s*해/,
+    /내 이름은\s*['"]?([가-힣A-Za-z0-9\s]{1,15}?)['"]?(?:야|이야|라고|입니다|이에요|어때|[.!,?])/i,
+    /이름은\s*['"]?([가-힣A-Za-z0-9\s]{1,15}?)['"]?(?:이?야|이야|라고\s*어때|어때)/i,
+    /이름은\s*['"]?([가-힣A-Za-z0-9\s]{1,15}?)['"]?(?:야|이야|라고|입니다|이에요|[.!,?])/i,
+    /나는\s*['"]?([가-힣A-Za-z0-9\s]{1,15}?)['"]?(?:야|이야|라고|입니다|이에요|[.!,?])/i,
+    /나는\s*['"]?([가-힣A-Za-z0-9\s]{1,15}?)['"]?라고\s*해/i,
   ];
 
   for (const pattern of patterns) {
